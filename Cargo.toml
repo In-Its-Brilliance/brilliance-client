@@ -1,0 +1,73 @@
+[package]
+name = "rheia-client"
+version = "0.1.34"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = []
+
+trace = ["tracing", "tracing-tracy", "tracy-client", "tracy-client-sys"]
+
+[dependencies]
+common = { path = "../rheia-common" }
+network = { path = "../rheia-network" }
+physics = { path = "../rheia-physics" }
+
+godot = { version = "0.4.2", features = ["experimental-threads"] }
+
+rand = "0.9"
+lazy_static = "1.5"
+regex = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+env_logger = "0.11"
+log = { version = "0.4" }
+chrono = "0.4.40"
+dirs-next = "2.0.0"
+tokio = { version = "1.44", features = [ "full" ] }
+
+zip = "2.6"
+
+arrayvec = "0.7"
+ahash = "0.8"
+dashmap = "6.1"
+parking_lot = "0.12"
+
+# Helpful macros for working with enums and strings
+strum = "0.27"
+strum_macros = "0.27"
+
+ndshape = "0.3"
+
+# Miltithread heavy tasks
+rayon = "1.10"
+
+# Async channels
+crossbeam = "0.8"
+crossbeam-channel = "0.5"
+
+# A blazingly fast multi-producer channel
+flume = "0.11"
+
+# Single thread links
+send_wrapper = "0.6"
+
+# Scripts
+rhai = { version = "1.21", features = ["internals", "serde"] }
+
+# Schematics
+flate2 = "1.1"
+fastnbt = "2"
+
+image = "0.25"
+imageproc = "0.25"
+
+tracing = { version = "0.1", optional = true }
+tracing-tracy = { version = "=0.11.4", optional = true }
+tracy-client = { version = "=0.18.0", optional = true }
+tracy-client-sys = { version = "=0.24.3", optional = true }
