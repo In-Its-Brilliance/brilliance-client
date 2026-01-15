@@ -36,7 +36,7 @@ fn get_world_mut(worlds_manager: &mut WorldsManager, world_slug: String) -> Opti
         }
     };
     if world_slug != *world.bind().get_slug() {
-        log::error!(target: "network", "Network message for non wrong world {} != {}", world_slug, world.bind().get_slug());
+        log::error!(target: "network", "Network message for wrong world {} != {}", world_slug, world.bind().get_slug());
         return None;
     }
     Some(world)

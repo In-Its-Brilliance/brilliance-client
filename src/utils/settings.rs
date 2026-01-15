@@ -45,15 +45,15 @@ impl GameSettings {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let mut path = match GameSettings::get_game_data_path() {
+        let path = match GameSettings::get_game_data_path() {
             Ok(p) => p,
             Err(e) => return Err(e),
         };
-        path.push("settings.yml");
         if !path.exists() {
-            create_dir_all(path.clone()).unwrap();
+            create_dir_all(&path).unwrap();
         }
-        let file = File::create(path.clone()).expect("File must exists");
+        let setting_path = path.join("settings.yml");
+        let file = File::create(&setting_path).expect("File must exists");
         if let Err(e) = serde_yaml::to_writer(file, &self) {
             return Err(format!("Settings file \"{}\" yaml write error: {}", path.display(), e));
         }
