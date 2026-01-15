@@ -66,7 +66,7 @@ impl GameSettings {
             None => return Err("Error getting the path for the settings file".to_string()),
         };
         let mut config_path = PathBuf::from(config_dir);
-        config_path.push("RheiaData");
+        config_path.push("BrillianceData");
         Ok(config_path)
     }
 }

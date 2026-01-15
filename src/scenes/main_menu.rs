@@ -155,7 +155,7 @@ impl IControl for MainMenu {
         }
         log::set_max_level(LOG_LEVEL);
 
-        log::info!(target: "main", "Loading Rheia version: {}", VERSION);
+        log::info!(target: "main", "Loading Brilliance version: {}", VERSION);
 
         #[cfg(feature = "trace")]
         log::info!(target: "main", "&6Tracy enabled");

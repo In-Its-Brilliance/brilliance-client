@@ -2,24 +2,24 @@
 
 ## Run tests
 ```shell
-cargo test -p rheia-client
+cargo test
 ```
 
 ## Build debug rust bynary for Linux and Windows
 ```shell
-cargo b -p rheia-client
+cargo build
 ```
 ## Build project for Linux
 ```shell
-godot --export-release linux_desktop ~/godot/Rheia.x86_64
+godot --export-release linux_desktop ~/godot/Brilliance.x86_64
 ```
 
 ## Build release for Windows from Linux
 ```shell
 rustup target add x86_64-pc-windows-gn
-cargo b -p rheia-client --release --target x86_64-pc-windows-gnu
+cargo build --release --target x86_64-pc-windows-gnu
 
-godot --export-release windows_desktop ~/Dropbox/Rheia/Rheia.exe
+godot --export-release windows_desktop ~/Dropbox/Brilliance/Brilliance.exe
 ```
 
 ## Run game from the console

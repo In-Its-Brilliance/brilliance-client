@@ -14,7 +14,7 @@ def generate():
     version = args.version
     if version is None:
         import toml  # pylint: disable=import-outside-toplevel
-        with open("./rheia-client/Cargo.toml", "r") as config:
+        with open("./brilliance-client/Cargo.toml", "r") as config:
             config_data = toml.load(config)
             version = config_data["package"]["version"]
 
@@ -22,7 +22,7 @@ def generate():
 
     path = args.path
     if path is None:
-        path = f'{os.path.expanduser("~")}/Dropbox/Rheia/windows-build-{version}'
+        path = f'{os.path.expanduser("~")}/Dropbox/Brilliance/windows-build-{version}'
 
     if os.path.exists(path):
         print(f'Path \"{path}\" already exists')
@@ -31,13 +31,13 @@ def generate():
     os.makedirs(path, exist_ok=True)
 
     print('Building dll')
-    res = os.system('cd ~/godot/rheia/rheia-godot/; cargo b -p rheia-client --release --target x86_64-pc-windows-gnu')
+    res = os.system('cd ~/Projects/In-Its-Brilliance/brilliance-godot/; cargo b -p brilliance-client --release --target x86_64-pc-windows-gnu')
     if res != 0:
         print(f'Godot build failed: {res}')
         return
 
     print('Building exe')
-    os.system(f'cd ~/godot/rheia/rheia-godot/; godot --export-release windows_desktop {path}/Rheia.exe')
+    os.system(f'cd ~/Projects/In-Its-Brilliance/brilliance-godot/; godot --export-release windows_desktop {path}/Brilliance.exe')
 
     if args.zip:
         print('Creating zip')
