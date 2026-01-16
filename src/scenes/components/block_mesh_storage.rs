@@ -4,9 +4,11 @@ use crate::{
     world::{
         block_storage::BlockStorage,
         chunks::{
-            chunk_data_formatter::generate_single_block, mesh::mesh_generator::{generate_buffer, generate_mesh},
+            chunk_data_formatter::generate_single_block,
+            mesh::mesh_generator::{generate_buffer, generate_mesh},
             objects_container::ObjectsContainer,
         },
+        worlds_manager::WorldMaterials,
     },
 };
 use ahash::HashMap;
@@ -17,10 +19,7 @@ use common::{
         chunk_data::{BlockDataInfo, BlockIndexType},
     },
 };
-use godot::{
-    classes::{Material, MeshInstance3D},
-    prelude::*,
-};
+use godot::{classes::MeshInstance3D, prelude::*};
 
 use super::block_icon::BlockIcon;
 
@@ -40,7 +39,7 @@ impl BlockMeshStorage {
         &mut self,
         block_id: BlockIndexType,
         block_type: &BlockType,
-        material: &Gd<Material>,
+        materials: &WorldMaterials,
         texture_mapper: &TextureMapper,
         block_storage: &BlockStorage,
         resource_storage: &ResourceStorage,
@@ -51,13 +50,13 @@ impl BlockMeshStorage {
                 let bordered_chunk_data = generate_single_block(&block_type, &block_info);
 
                 let buffer = generate_buffer(&bordered_chunk_data);
-                let mesh_ist = generate_mesh(texture_mapper, &buffer, &block_storage);
+                let mesh_ist = generate_mesh(texture_mapper, &buffer, &block_storage, false);
 
                 let mut mesh = MeshInstance3D::new_alloc();
                 mesh.set_name("Block mesh");
 
                 mesh.set_mesh(&mesh_ist);
-                mesh.set_material_overlay(material);
+                mesh.set_material_overlay(&materials.get_material_3d());
 
                 let mut obj = Node3D::new_alloc();
                 obj.set_name(&format!("BlockTexture #{}", block_info.get_id()));
@@ -109,7 +108,7 @@ impl BlockMeshStorage {
 
     pub fn init(
         block_storage: &BlockStorage,
-        material: &Gd<Material>,
+        materials: &WorldMaterials,
         resource_manager: &ResourceManager,
         texture_mapper: &TextureMapper,
     ) -> Gd<Self> {
@@ -123,7 +122,7 @@ impl BlockMeshStorage {
             storage.generate_block_mesh(
                 block_id,
                 block_type,
-                material,
+                materials,
                 texture_mapper,
                 block_storage,
                 &*resource_manager.get_resources_storage(),

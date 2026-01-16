@@ -77,6 +77,7 @@ pub fn generate_mesh(
     texture_mapper: &TextureMapper,
     buffer: &UnitQuadBuffer,
     block_storage: &BlockStorage,
+    only_translucent: bool,
 ) -> Gd<ArrayMesh> {
     // let chunk_collider_data = &_get_test_sphere(8.0, BlockInfo::create(1, None));
 
@@ -99,6 +100,22 @@ pub fn generate_mesh(
         // face is OrientedBlockFace
         // group Vec<UnorientedUnitQuad>
         for quad in group.into_iter() {
+
+            let block_info = quad
+                .block_info
+                .expect("GENERATE_CHUNK_GEOMETRY block info is not found");
+            let block_type = block_storage
+                .get(&block_info.get_id())
+                .expect("GENERATE_CHUNK_GEOMETRY block type is not found");
+
+            if *block_type.get_voxel_visibility() != VoxelVisibility::Translucent && only_translucent {
+                continue;
+            }
+
+            if *block_type.get_voxel_visibility() == VoxelVisibility::Translucent && !only_translucent {
+                continue;
+            }
+
             let i = face.quad_mesh_indices(verts.len() as i32);
             indices.extend(i);
 
@@ -113,13 +130,6 @@ pub fn generate_mesh(
 
             let n = face.signed_normal();
             normals.extend([Vector3::new(n.x as f32, n.y as f32, n.z as f32); 4]);
-
-            let block_info = quad
-                .block_info
-                .expect("GENERATE_CHUNK_GEOMETRY block info is not found");
-            let block_type = block_storage
-                .get(&block_info.get_id())
-                .expect("GENERATE_CHUNK_GEOMETRY block type is not found");
 
             let unoriented_quad = UnorientedQuad::from(quad);
             for i in &face.tex_coords_godot(

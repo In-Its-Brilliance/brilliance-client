@@ -2,7 +2,7 @@ use super::{
     block_storage::BlockStorage,
     chunks::chunks_map::ChunkMap,
     physics::PhysicsProxy,
-    worlds_manager::{BlockStorageType, TextureMapperType},
+    worlds_manager::{BlockStorageType, TextureMapperType, WorldMaterials},
 };
 use crate::{
     client_scripts::resource_manager::{ResourceManager, ResourceStorage},
@@ -13,7 +13,7 @@ use common::chunks::{
     chunk_data::{BlockDataInfo, ChunkData},
     chunk_position::ChunkPosition,
 };
-use godot::{classes::Material, prelude::*};
+use godot::prelude::*;
 
 /// Godot world
 /// Contains all things inside world
@@ -35,7 +35,7 @@ pub struct WorldManager {
     entities_manager: Gd<EntitiesManager>,
 
     texture_mapper: TextureMapperType,
-    material: Gd<Material>,
+    materials: WorldMaterials,
     block_storage: BlockStorageType,
 }
 
@@ -44,7 +44,7 @@ impl WorldManager {
         base: Base<Node>,
         slug: String,
         texture_mapper: TextureMapperType,
-        material: Gd<Material>,
+        materials: WorldMaterials,
         block_storage: BlockStorageType,
     ) -> Self {
         let physics = PhysicsProxy::default();
@@ -58,10 +58,12 @@ impl WorldManager {
 
             physics,
 
-            entities_manager: Gd::<EntitiesManager>::from_init_fn(|base| EntitiesManager::create(base)),
+            entities_manager: Gd::<EntitiesManager>::from_init_fn(|base| {
+                EntitiesManager::create(base)
+            }),
 
             texture_mapper,
-            material,
+            materials,
             block_storage,
         }
     }
@@ -91,7 +93,12 @@ impl WorldManager {
     }
 
     /// Recieve chunk data from network
-    pub fn recieve_chunk(&mut self, center: ChunkPosition, chunk_position: ChunkPosition, data: ChunkData) {
+    pub fn recieve_chunk(
+        &mut self,
+        center: ChunkPosition,
+        chunk_position: ChunkPosition,
+        data: ChunkData,
+    ) {
         self.chunk_map
             .bind_mut()
             .create_chunk_column(center, chunk_position, data);
@@ -109,9 +116,13 @@ impl WorldManager {
         new_block_info: Option<BlockDataInfo>,
         resource_storage: &ResourceStorage,
     ) -> Result<(), String> {
-        self.chunk_map
-            .bind()
-            .edit_block(position, block_storage, new_block_info, &self.physics, resource_storage)
+        self.chunk_map.bind().edit_block(
+            position,
+            block_storage,
+            new_block_info,
+            &self.physics,
+            resource_storage,
+        )
     }
 
     pub fn physics_process(&mut self, delta: f64) {
@@ -144,7 +155,7 @@ impl WorldManager {
 
         let to_load_now = std::time::Instant::now();
         map.send_chunks_to_load(
-            self.material.instance_id(),
+            &self.materials,
             self.texture_mapper.clone(),
             self.block_storage.clone(),
             &self.physics,

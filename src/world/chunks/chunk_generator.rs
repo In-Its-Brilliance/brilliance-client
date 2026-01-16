@@ -11,14 +11,14 @@ use crate::{
     world::{
         block_storage::BlockStorage,
         physics::PhysicsProxy,
-        worlds_manager::{BlockStorageType, TextureMapperType},
+        worlds_manager::{BlockStorageType, TextureMapperType, WorldMaterials},
     },
 };
 use common::VERTICAL_SECTIONS;
 use flume::Sender;
 use godot::{
     classes::Engine,
-    obj::{Gd, InstanceId, Singleton},
+    obj::{Gd, Singleton},
 };
 
 /// Generate chunk data in separate thread
@@ -27,7 +27,7 @@ pub(crate) fn generate_chunk(
     chunk_column: ChunkLock,
     chunks_near: NearChunksData,
     chunks_loaded: Sender<ChunkLock>,
-    material_instance_id: InstanceId,
+    materials: WorldMaterials,
 
     texture_mapper: TextureMapperType,
     block_storage: BlockStorageType,
@@ -41,7 +41,7 @@ pub(crate) fn generate_chunk(
 
         let chunk_position = chunk_column.read().get_chunk_position().clone();
 
-        chunk_column.read().spawn_sections(&material_instance_id);
+        chunk_column.read().spawn_sections(&materials);
         for y in 0..VERTICAL_SECTIONS {
             let (bordered_chunk_data, mesh_count) = format_chunk_data_with_boundaries(
                 Some(&chunks_near),
@@ -94,11 +94,14 @@ pub fn generate_chunk_geometry(
     let buffer = generate_buffer(chunk_collider_data);
     let mut cs = chunk_section.bind_mut();
 
-    let mesh_ist = generate_mesh(&texture_mapper, &buffer, &block_storage);
-    cs.set_new_mesh(&mesh_ist);
+    let new_mesh = generate_mesh(&texture_mapper, &buffer, &block_storage, false);
+    let new_mesh_transparent = generate_mesh(&texture_mapper, &buffer, &block_storage, true);
+    cs.set_new_mesh(&new_mesh, &new_mesh_transparent);
+
+    let has_mesh = new_mesh.get_surface_count() > 0 || new_mesh_transparent.get_surface_count() > 0;
 
     if !Engine::singleton().is_editor_hint() {
-        let collider_builder = match mesh_ist.get_surface_count() > 0 {
+        let collider_builder = match has_mesh {
             true => Some(build_collider(&buffer)),
             false => None,
         };

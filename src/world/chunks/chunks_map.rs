@@ -10,7 +10,7 @@ use crate::{
     world::{
         block_storage::BlockStorage,
         physics::PhysicsProxy,
-        worlds_manager::{BlockStorageType, TextureMapperType},
+        worlds_manager::{BlockStorageType, TextureMapperType, WorldMaterials},
     },
 };
 use ahash::{AHashMap, HashSet};
@@ -129,7 +129,7 @@ impl ChunkMap {
     /// Can be sended only if all bordered chunks are loaded
     pub fn send_chunks_to_load(
         &mut self,
-        material_instance_id: InstanceId,
+        materials: &WorldMaterials,
         texture_mapper: TextureMapperType,
         block_storage: BlockStorageType,
         physics: &PhysicsProxy,
@@ -160,7 +160,7 @@ impl ChunkMap {
                 chunk_column.clone(),
                 near_chunks_data,
                 self.chunks_to_spawn.0.clone(),
-                material_instance_id,
+                materials.clone(),
                 texture_mapper.clone(),
                 block_storage.clone(),
                 physics.clone(),

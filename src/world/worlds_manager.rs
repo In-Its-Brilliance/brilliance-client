@@ -1,9 +1,10 @@
 use common::chunks::block_position::{BlockPosition, BlockPositionTrait};
+use godot::classes::base_material_3d::TextureParam;
 use godot::classes::StandardMaterial3D;
 use godot::prelude::*;
 use godot::{classes::Material, prelude::Gd};
-use parking_lot::RwLock;
 use parking_lot::lock_api::{RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::RwLock;
 use std::sync::Arc;
 
 use crate::client_scripts::resource_manager::{ResourceManager, ResourceStorage};
@@ -17,6 +18,31 @@ use super::world_manager::WorldManager;
 
 pub type TextureMapperType = Arc<RwLock<TextureMapper>>;
 pub type BlockStorageType = Arc<RwLock<BlockStorage>>;
+
+#[derive(Clone)]
+pub struct WorldMaterials {
+    material_3d_id: InstanceId,
+    material_3d_transparent_id: InstanceId,
+}
+
+impl WorldMaterials {
+    pub fn create(material_3d: Gd<Material>, material_3d_transparent: Gd<Material>) -> Self{
+        Self {
+            material_3d_id: material_3d.instance_id(),
+            material_3d_transparent_id: material_3d_transparent.instance_id(),
+        }
+    }
+
+    pub fn get_material_3d(&self) -> Gd<Material> {
+        let material: Gd<Material> = Gd::from_instance_id(self.material_3d_id);
+        material
+    }
+
+    pub fn get_material_3d_transparent(&self) -> Gd<Material> {
+        let material: Gd<Material> = Gd::from_instance_id(self.material_3d_transparent_id);
+        material
+    }
+}
 
 #[derive(GodotClass)]
 #[class(init, tool, base=Node)]
@@ -37,6 +63,9 @@ pub struct WorldsManager {
     #[export]
     terrain_material: Option<Gd<StandardMaterial3D>>,
 
+    #[export]
+    terrain_material_transparent: Option<Gd<StandardMaterial3D>>,
+
     block_mesh_storage: Option<Gd<BlockMeshStorage>>,
 }
 
@@ -49,14 +78,17 @@ impl WorldsManager {
 
         texture_mapper.clear();
 
-        let mut material_3d = self
-            .terrain_material
-            .as_mut()
-            .expect("Terrain StandardMaterial3D is not set");
-        match texture_mapper.build(&*block_storage, resources_storage, &mut material_3d) {
+        let image_texture = match texture_mapper.build(&*block_storage, resources_storage) {
             Ok(i) => i,
             Err(e) => return Err(e),
         };
+
+        let material_3d = self
+            .terrain_material
+            .as_mut()
+            .expect("terrain_material is not set");
+        material_3d.set_texture(TextureParam::ALBEDO, &image_texture);
+
         log::info!(target: "main", "Textures builded successfily; texture blocks:{} textures loaded:{} (executed:{:.2?})", block_storage.textures_blocks_count(), texture_mapper.len(), now.elapsed());
         return Ok(());
     }
@@ -65,7 +97,7 @@ impl WorldsManager {
         let block_mesh_storage = {
             BlockMeshStorage::init(
                 &*self.get_block_storage(),
-                &self.get_material(),
+                &self.get_materials(),
                 &*resource_manager,
                 &*self.get_texture_mapper(),
             )
@@ -89,7 +121,9 @@ impl WorldsManager {
         self.resource_manager = Some(resource_manager);
     }
 
-    pub fn get_block_storage_mut(&self) -> RwLockWriteGuard<'_, parking_lot::RawRwLock, BlockStorage> {
+    pub fn get_block_storage_mut(
+        &self,
+    ) -> RwLockWriteGuard<'_, parking_lot::RawRwLock, BlockStorage> {
         self.block_storage.write()
     }
 
@@ -130,13 +164,21 @@ impl WorldsManager {
         player_controller
     }
 
-    pub fn get_material(&self) -> Gd<Material> {
+    pub fn get_materials(&self) -> WorldMaterials {
         let material_3d = self
             .terrain_material
             .as_ref()
             .expect("Terrain StandardMaterial3D is not set")
             .clone();
-        material_3d.upcast::<Material>()
+        let material_3d_transparent = self
+            .terrain_material_transparent
+            .as_ref()
+            .expect("Terrain StandardMaterial3D is not set")
+            .clone();
+        WorldMaterials::create(
+            material_3d.upcast::<Material>(),
+            material_3d_transparent.upcast::<Material>(),
+        )
     }
 
     pub fn create_world(&mut self, world_slug: String) -> Gd<WorldManager> {
@@ -147,7 +189,7 @@ impl WorldsManager {
                 base,
                 world_slug.clone(),
                 self.texture_mapper.clone(),
-                self.get_material(),
+                self.get_materials(),
                 self.block_storage.clone(),
             )
         });
@@ -218,7 +260,8 @@ impl INode for WorldsManager {
                 let mut player_controller = player_controller.bind_mut();
 
                 let pos = player_controller.get_position();
-                let chunk_pos = BlockPosition::new(pos.x as i64, pos.y as i64, pos.z as i64).get_chunk_position();
+                let chunk_pos = BlockPosition::new(pos.x as i64, pos.y as i64, pos.z as i64)
+                    .get_chunk_position();
                 let chunk_loaded = match world.bind().get_chunk_map().get_chunk(&chunk_pos) {
                     Some(c) => c.read().is_loaded(),
                     None => false,
@@ -227,7 +270,9 @@ impl INode for WorldsManager {
             }
 
             if let Some(resource_manager) = self.resource_manager.as_ref() {
-                world.bind_mut().custom_process(delta, &*resource_manager.borrow());
+                world
+                    .bind_mut()
+                    .custom_process(delta, &*resource_manager.borrow());
             }
         }
     }

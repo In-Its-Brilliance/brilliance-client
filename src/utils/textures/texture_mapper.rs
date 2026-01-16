@@ -1,7 +1,7 @@
 use common::blocks::block_type::{BlockColor, BlockContent, BlockType};
 use godot::{
     builtin::PackedByteArray,
-    classes::{Image, ImageTexture, StandardMaterial3D, base_material_3d::TextureParam},
+    classes::{Image, ImageTexture},
     obj::{Gd, NewGd},
 };
 
@@ -20,8 +20,7 @@ impl TextureMapper {
         &mut self,
         block_storage: &BlockStorage,
         resource_storage: &ResourceStorage,
-        material_3d: &mut Gd<StandardMaterial3D>,
-    ) -> Result<(), String> {
+    ) -> Result<Gd<ImageTexture>, String> {
         let mut pba = PackedByteArray::new();
 
         let m = match self.generate_texture(block_storage, resource_storage) {
@@ -34,8 +33,7 @@ impl TextureMapper {
         image.load_png_from_buffer(&pba);
         let mut image_texture = ImageTexture::new_gd();
         image_texture.set_image(&image);
-        material_3d.set_texture(TextureParam::ALBEDO, &image_texture);
-        Ok(())
+        Ok(image_texture)
     }
 
     pub fn clear(&mut self) {
@@ -76,19 +74,22 @@ impl TextureMapper {
 
                     // Side texture
                     if let Some(texture) = side_texture.as_ref() {
-                        let mut side_texture_image = resource_storage.generate_image(texture).unwrap();
+                        let mut side_texture_image =
+                            resource_storage.generate_image(texture).unwrap();
                         match colors_scheme {
                             Some(colors) => {
                                 for color in colors {
-                                    let index = self.add_texture_index(texture.clone(), Some(&color));
+                                    let index =
+                                        self.add_texture_index(texture.clone(), Some(&color));
 
                                     if let Some(side_overlay) = side_overlay {
                                         let mut overlay_texture_image =
                                             resource_storage.generate_image(side_overlay).unwrap();
-                                        overlay_texture_image = overlay_texture_image.change_color_balance(color);
+                                        overlay_texture_image =
+                                            overlay_texture_image.change_color_balance(color);
 
-                                        let new_side_texture_image =
-                                            side_texture_image.overlay_on_top(&overlay_texture_image);
+                                        let new_side_texture_image = side_texture_image
+                                            .overlay_on_top(&overlay_texture_image);
                                         texture_pack.add_subimage(&new_side_texture_image, index);
                                     } else {
                                         texture_pack.add_subimage(&side_texture_image, index);
@@ -128,7 +129,10 @@ impl TextureMapper {
     pub fn add_texture_index(&mut self, texture_name: String, _color: Option<&BlockColor>) -> i64 {
         // TODO: color
 
-        assert!(!self.textures_map.contains(&texture_name), "texture already exists");
+        assert!(
+            !self.textures_map.contains(&texture_name),
+            "texture already exists"
+        );
         self.textures_map.push(texture_name);
         self.textures_map.len() as i64 - 1_i64
     }

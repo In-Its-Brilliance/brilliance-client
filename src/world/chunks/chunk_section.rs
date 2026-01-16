@@ -1,14 +1,17 @@
 use super::objects_container::ObjectsContainer;
 use crate::{
     utils::bridge::{GodotPositionConverter, IntoNetworkVector},
-    world::physics::{PhysicsProxy, PhysicsType},
+    world::{
+        physics::{PhysicsProxy, PhysicsType},
+        worlds_manager::WorldMaterials,
+    },
 };
 use common::{
     blocks::chunk_collider_info::ChunkColliderInfo, chunks::chunk_position::ChunkPosition,
     CHUNK_SIZE, CHUNK_SIZE_BOUNDARY,
 };
 use godot::{
-    classes::{ArrayMesh, Material, MeshInstance3D},
+    classes::{ArrayMesh, MeshInstance3D},
     prelude::*,
 };
 use ndshape::{ConstShape, ConstShape3u32};
@@ -36,6 +39,7 @@ pub struct ChunkSection {
     pub(crate) base: Base<Node3D>,
 
     mesh: Gd<MeshInstance3D>,
+    mesh_transparent: Gd<MeshInstance3D>,
     objects_container: Gd<ObjectsContainer>,
 
     chunk_position: ChunkPosition,
@@ -52,20 +56,22 @@ pub struct ChunkSection {
 impl ChunkSection {
     pub fn create(
         base: Base<Node3D>,
-        material: Gd<Material>,
+        materials: &WorldMaterials,
         y: u8,
         chunk_position: ChunkPosition,
     ) -> Self {
         let mut mesh = MeshInstance3D::new_alloc();
         mesh.set_name(&format!("ChunkMesh {}", y));
-        mesh.set_material_override(&material);
+        mesh.set_material_override(&materials.get_material_3d());
 
-        // Disable while its empty
-        mesh.set_process(false);
+        let mut mesh_transparent = MeshInstance3D::new_alloc();
+        mesh_transparent.set_name(&format!("ChunkMesh {} Transparent", y));
+        mesh_transparent.set_material_override(&materials.get_material_3d_transparent());
 
         Self {
             base,
             mesh,
+            mesh_transparent,
             chunk_position,
             y,
 
@@ -105,16 +111,16 @@ impl ChunkSection {
     }
 
     /// Updates the mesh from a separate thread
-    pub fn set_new_mesh(&mut self, mesh_ist: &Gd<ArrayMesh>) {
-        let mesh = self.mesh.borrow_mut();
-
-        let c = mesh_ist.get_surface_count();
-
+    pub fn set_new_mesh(&mut self, new_mesh: &Gd<ArrayMesh>, new_mesh_transparent: &Gd<ArrayMesh>) {
         // Set active only for sections that conatains vertices
-        let has_mesh = c > 0;
-        mesh.set_process(has_mesh);
+        let has_mesh =
+            new_mesh.get_surface_count() > 0 || new_mesh_transparent.get_surface_count() > 0;
 
-        mesh.set_mesh(mesh_ist);
+        let mesh = self.mesh.borrow_mut();
+        mesh.set_mesh(new_mesh);
+
+        let mesh_transparent = self.mesh_transparent.borrow_mut();
+        mesh_transparent.set_mesh(new_mesh_transparent);
 
         if has_mesh && !self.set_geometry_first_time {
             self.set_geometry_first_time = true;
@@ -170,15 +176,21 @@ impl INode3D for ChunkSection {
         let mesh = self.mesh.clone();
         self.base_mut().add_child(&mesh);
 
+        let mesh_transparent = self.mesh_transparent.clone();
+        self.base_mut().add_child(&mesh_transparent);
+
         let objects_container = self.objects_container.clone();
         self.base_mut().add_child(&objects_container);
     }
 
     fn process(&mut self, delta: f64) {
         if self.transparancy > 0.0 {
-            let obj = self.mesh.borrow_mut();
+            let mesh = self.mesh.borrow_mut();
             self.transparancy -= TRANSPARENCY_SPEED * delta as f32;
-            obj.set_transparency(self.transparancy);
+            mesh.set_transparency(self.transparancy);
+
+            let mesh_transparent = self.mesh_transparent.borrow_mut();
+            mesh_transparent.set_transparency(self.transparancy);
         }
     }
 }

@@ -1,17 +1,19 @@
 use common::{
-    CHUNK_SIZE, VERTICAL_SECTIONS,
     chunks::{
         block_position::{BlockPosition, ChunkBlockPosition},
         chunk_data::{BlockDataInfo, ChunkData},
         chunk_position::ChunkPosition,
     },
+    CHUNK_SIZE, VERTICAL_SECTIONS,
 };
-use godot::{classes::Material, prelude::*};
+use godot::prelude::*;
 use parking_lot::RwLock;
 use std::sync::{
-    Arc,
     atomic::{AtomicBool, Ordering},
+    Arc,
 };
+
+use crate::world::worlds_manager::WorldMaterials;
 
 use super::chunk_section::ChunkSection;
 
@@ -35,13 +37,13 @@ impl ChunkBase {
         }
     }
 
-    pub fn spawn_sections(&mut self, chunk_position: &ChunkPosition, material: Gd<Material>) {
+    pub fn spawn_sections(&mut self, chunk_position: &ChunkPosition, materials: &WorldMaterials) {
         let name = format!("ChunkColumn {}", chunk_position);
         self.base_mut().set_name(&name);
 
         for y in 0..VERTICAL_SECTIONS {
             let mut section = Gd::<ChunkSection>::from_init_fn(|base| {
-                ChunkSection::create(base, material.clone(), y as u8, chunk_position.clone())
+                ChunkSection::create(base, materials, y as u8, chunk_position.clone())
             });
 
             let name = format!("Section {}", y);
@@ -80,7 +82,9 @@ impl ChunkColumn {
             loaded: Arc::new(AtomicBool::new(false)),
         };
 
-        chunk_column.get_base().set_position(chunk_column.get_position());
+        chunk_column
+            .get_base()
+            .set_position(chunk_column.get_position());
 
         chunk_column
     }
@@ -93,13 +97,14 @@ impl ChunkColumn {
     /// Spawning ChunkColumn
     /// all 0..VERTICAL_SECTIONS from bottom to top
     /// and add them as a childs to the base node of chunk column
-    pub fn spawn_sections(&self, material_instance_id: &InstanceId) {
+    pub fn spawn_sections(&self, materials: &WorldMaterials) {
         assert!(!self.is_loaded(), "Chunk cannot spawn sections twice!");
 
         let mut chunk_base = self.get_base();
 
-        let material: Gd<Material> = Gd::from_instance_id(*material_instance_id);
-        chunk_base.bind_mut().spawn_sections(&self.chunk_position, material);
+        chunk_base
+            .bind_mut()
+            .spawn_sections(&self.chunk_position, materials);
     }
 
     pub fn get_chunk_section(&self, y: &usize) -> Gd<ChunkSection> {
