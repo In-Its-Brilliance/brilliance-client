@@ -4,7 +4,7 @@ use crate::{
     world::{
         block_storage::BlockStorage,
         chunks::{
-            chunk_data_formatter::generate_single_block, mesh::mesh_generator::generate_chunk_geometry,
+            chunk_data_formatter::generate_single_block, mesh::mesh_generator::{generate_buffer, generate_mesh},
             objects_container::ObjectsContainer,
         },
     },
@@ -49,12 +49,14 @@ impl BlockMeshStorage {
             BlockContent::Texture { .. } => {
                 let block_info = BlockDataInfo::create(block_id, None);
                 let bordered_chunk_data = generate_single_block(&block_type, &block_info);
-                let geometry = generate_chunk_geometry(texture_mapper, &bordered_chunk_data, &block_storage);
+
+                let buffer = generate_buffer(&bordered_chunk_data);
+                let mesh_ist = generate_mesh(texture_mapper, &buffer, &block_storage);
 
                 let mut mesh = MeshInstance3D::new_alloc();
                 mesh.set_name("Block mesh");
 
-                mesh.set_mesh(&geometry.mesh_ist);
+                mesh.set_mesh(&mesh_ist);
                 mesh.set_material_overlay(material);
 
                 let mut obj = Node3D::new_alloc();
@@ -73,7 +75,14 @@ impl BlockMeshStorage {
                 let position = BlockPosition::new(0, 0, 0);
                 objects_container
                     .bind_mut()
-                    .create_block_model(&position, model, collider_type, None, resource_storage, None)
+                    .create_block_model(
+                        &position,
+                        model,
+                        collider_type,
+                        None,
+                        resource_storage,
+                        None,
+                    )
                     .unwrap();
 
                 let icon_size = match icon_size {
@@ -85,7 +94,12 @@ impl BlockMeshStorage {
                 let obj = objects_container.bind().get_first().clone();
 
                 // Get content of object
-                let obj = obj.bind().get_content().duplicate().unwrap().cast::<Node3D>();
+                let obj = obj
+                    .bind()
+                    .get_content()
+                    .duplicate()
+                    .unwrap()
+                    .cast::<Node3D>();
 
                 self.meshes
                     .insert(block_id, (BlockMesh::ModelCube(obj), 3.0 / icon_size));
