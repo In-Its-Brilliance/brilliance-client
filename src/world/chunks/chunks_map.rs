@@ -31,7 +31,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 const MAX_CHUNKS_SPAWN_PER_FRAME: i32 = 6;
-const LIMIT_CHUNK_LOADING_AT_A_TIME: u32 = 16;
+pub const LIMIT_CHUNK_LOADING_AT_A_TIME: u32 = 16;
 
 pub type ChunkLock = Arc<RwLock<ChunkColumn>>;
 pub type ChunksType = AHashMap<ChunkPosition, ChunkLock>;
@@ -45,7 +45,7 @@ pub struct ChunkMap {
     // Hash map with chunk columns
     chunks: ChunksType,
 
-    sended_chunks: Rc<RefCell<Vec<ChunkPosition>>>,
+    waiting_chunks: Rc<RefCell<Vec<ChunkPosition>>>,
     chunks_to_spawn: (Sender<ChunkLock>, Receiver<ChunkLock>),
 
     chunks_to_update: Rc<RefCell<HashSet<(ChunkPosition, usize)>>>,
@@ -64,15 +64,31 @@ impl ChunkMap {
         Self {
             base,
             chunks: Default::default(),
-            sended_chunks: Default::default(),
+            waiting_chunks: Default::default(),
             chunks_to_spawn: unbounded(),
             chunks_to_update: Default::default(),
             loading_chunks: Default::default(),
         }
     }
 
-    pub fn get_chunks_count(&self) -> usize {
-        self.chunks.len()
+    pub fn get_loaded_chunks_count(&self) -> usize {
+        let loaded_count = self
+            .chunks
+            .values()
+            .filter(|chunk_lock| {
+                let chunk = chunk_lock.read();
+                chunk.is_loaded()
+            })
+            .count();
+        loaded_count
+    }
+
+    pub fn get_waiting_chunks_count(&self) -> usize {
+        self.waiting_chunks.borrow().len()
+    }
+
+    pub fn get_loading_chunks_count(&self) -> u32 {
+        *self.loading_chunks.borrow()
     }
 
     pub fn get_chunk(&self, chunk_position: &ChunkPosition) -> Option<ChunkLock> {
@@ -112,12 +128,12 @@ impl ChunkMap {
         self.chunks
             .insert(chunk_position.clone(), Arc::new(RwLock::new(chunk_column)));
 
-        if self.sended_chunks.borrow().contains(&chunk_position) {
-            panic!("sended_chunks already have chunk");
+        if self.waiting_chunks.borrow().contains(&chunk_position) {
+            panic!("waiting_chunks already have chunk");
         }
-        self.sended_chunks.borrow_mut().push(chunk_position);
+        self.waiting_chunks.borrow_mut().push(chunk_position);
 
-        self.sended_chunks.borrow_mut().sort_by(|a, b| {
+        self.waiting_chunks.borrow_mut().sort_by(|a, b| {
             a.get_distance(&center)
                 .partial_cmp(&b.get_distance(&center))
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -139,7 +155,7 @@ impl ChunkMap {
             return;
         }
 
-        self.sended_chunks.borrow_mut().retain(|chunk_position| {
+        self.waiting_chunks.borrow_mut().retain(|chunk_position| {
             if *self.loading_chunks.borrow() > LIMIT_CHUNK_LOADING_AT_A_TIME {
                 return true;
             }

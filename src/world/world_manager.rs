@@ -84,10 +84,6 @@ impl WorldManager {
         &self.slug
     }
 
-    pub fn get_chunks_count(&self) -> usize {
-        self.chunk_map.bind().get_chunks_count()
-    }
-
     pub fn get_chunk_map(&self) -> GdRef<'_, ChunkMap> {
         self.chunk_map.bind()
     }

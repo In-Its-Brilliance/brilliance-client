@@ -60,7 +60,7 @@ pub fn format_chunk_data_with_boundaries(
     let mut mesh_count = 0;
 
     let cd = chunk_data.read();
-    let section_data = cd.get(y).unwrap();
+    let section_data = cd.get(y).expect(&format!("chunk_data section_data index {} not found", y));
 
     for x in 0_u32..(CHUNK_SIZE as u32) {
         for y in 0_u32..(CHUNK_SIZE as u32) {

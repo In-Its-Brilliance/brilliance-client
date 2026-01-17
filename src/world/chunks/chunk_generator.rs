@@ -43,13 +43,18 @@ pub(crate) fn generate_chunk(
 
         chunk_column.read().spawn_sections(&materials);
         for y in 0..VERTICAL_SECTIONS {
-            let (bordered_chunk_data, mesh_count) = format_chunk_data_with_boundaries(
+            let (bordered_chunk_data, mesh_count) = match format_chunk_data_with_boundaries(
                 Some(&chunks_near),
                 &data,
                 &*block_storage.read(),
                 y,
-            )
-            .unwrap();
+            ) {
+                Ok(i) => i,
+                Err(e) => {
+                    log::error!("&cformat_chunk_data_with_boundaries error: &4{}", e);
+                    panic!("format_chunk_data_with_boundaries error: {}", e);
+                },
+            };
 
             if mesh_count > 0 {
                 let mut chunk_section = chunk_column.read().get_chunk_section(&y);
