@@ -23,7 +23,9 @@ use godot::global::{deg_to_rad, lerp_angle};
 use godot::prelude::*;
 use network::entities::EntityNetworkComponent;
 use network::messages::NetworkEntitySkin;
-use physics::physics::{IPhysicsCharacterController, IPhysicsCollider, IPhysicsColliderBuilder, IQueryFilter};
+use physics::physics::{
+    IPhysicsCharacterController, IPhysicsCollider, IPhysicsColliderBuilder, IQueryFilter,
+};
 use physics::{PhysicsCharacterController, PhysicsCollider, PhysicsColliderBuilder, QueryFilter};
 
 const TURN_SPEED: f64 = 6.0;
@@ -81,16 +83,19 @@ pub struct PlayerController {
 impl PlayerController {
     pub fn create(base: Base<Node3D>, physics: PhysicsProxy) -> Self {
         let controls = Controls::new_alloc();
-        let mut camera_controller =
-            Gd::<CameraController>::from_init_fn(|base| CameraController::create(base, controls.clone()));
+        let mut camera_controller = Gd::<CameraController>::from_init_fn(|base| {
+            CameraController::create(base, controls.clone())
+        });
 
         // Change vertical offset
         camera_controller.set_position(Vector3::new(0.0, CONTROLLER_CAMERA_OFFSET_VERTICAL, 0.0));
 
-        let collider_builder = PhysicsColliderBuilder::cylinder(CONTROLLER_HEIGHT / 2.0, CONTROLLER_RADIUS);
+        let collider_builder =
+            PhysicsColliderBuilder::cylinder(CONTROLLER_HEIGHT / 2.0, CONTROLLER_RADIUS);
         let collider = physics.clone().create_collider(collider_builder, None);
 
-        let building_visualizer = Gd::<BuildingVisualizer>::from_init_fn(|base| BuildingVisualizer::create(base));
+        let building_visualizer =
+            Gd::<BuildingVisualizer>::from_init_fn(|base| BuildingVisualizer::create(base));
 
         let block_menu = Gd::<BlockMenu>::from_init_fn(|base| BlockMenu::create(base));
 
@@ -104,7 +109,10 @@ impl PlayerController {
             controls,
             cache_movement: None,
 
-            character_controller: PhysicsCharacterController::create(Some(CONTROLLER_MASS), Some(SNAP_TO_GROUND)),
+            character_controller: PhysicsCharacterController::create(
+                Some(CONTROLLER_MASS),
+                Some(SNAP_TO_GROUND),
+            ),
             collider,
 
             vertical_movement: 0.0,
@@ -127,7 +135,9 @@ impl PlayerController {
 
     pub fn set_selected_item(&mut self, new_item: Option<SelectedItem>) {
         self.selected_item = new_item.clone();
-        self.building_visualizer.bind_mut().set_selected_item(new_item);
+        self.building_visualizer
+            .bind_mut()
+            .set_selected_item(new_item);
     }
 
     pub fn get_selected_item(&self) -> &Option<SelectedItem> {
@@ -142,7 +152,8 @@ impl PlayerController {
                 }
                 None => {
                     let components = vec![EntityNetworkComponent::Skin(Some(skin))];
-                    let mut entity = Gd::<Entity>::from_init_fn(|base| Entity::create(base, components));
+                    let mut entity =
+                        Gd::<Entity>::from_init_fn(|base| Entity::create(base, components));
                     self.base_mut().add_child(&entity);
                     let entity_visible = match self.camera_mode {
                         CameraMode::FirstPerson => false,
@@ -193,7 +204,8 @@ impl PlayerController {
 
         // The center of the physical collider at his center
         // So it shifts to half the height
-        let physics_pos = Vector3::new(position.x, position.y + CONTROLLER_HEIGHT / 2.0, position.z);
+        let physics_pos =
+            Vector3::new(position.x, position.y + CONTROLLER_HEIGHT / 2.0, position.z);
         self.collider.set_position(physics_pos.to_network());
     }
 
@@ -207,7 +219,10 @@ impl PlayerController {
             entity.set_visible(entity_visible);
         }
         match self.camera_mode {
-            CameraMode::FirstPerson => self.camera_controller.bind_mut().set_camera_distance(0.0, 0.0),
+            CameraMode::FirstPerson => self
+                .camera_controller
+                .bind_mut()
+                .set_camera_distance(0.0, 0.0),
             CameraMode::ThirdPerson => self
                 .camera_controller
                 .bind_mut()
@@ -287,7 +302,11 @@ impl PlayerController {
         } else {
             if direction != Vector3::ZERO {
                 let mut new_rotate = -direction.x.atan2(-direction.z) % 360.0;
-                new_rotate = lerp_angle(entity.get_rotation().y as f64, new_rotate as f64, TURN_SPEED * delta) as f32;
+                new_rotate = lerp_angle(
+                    entity.get_rotation().y as f64,
+                    new_rotate as f64,
+                    TURN_SPEED * delta,
+                ) as f32;
 
                 // Update skin rotation for visual display
                 entity
@@ -364,19 +383,22 @@ impl PlayerController {
             let movement = self.get_movement(delta);
 
             let mut filter = QueryFilter::default();
-
             // Only solid ground
             filter.exclude_sensors();
-
             filter.exclude_collider(&self.collider);
+            filter.predicate(Box::new(|index: usize| true));
 
             let move_shape_now = std::time::Instant::now();
-            let translation =
-                self.character_controller
-                    .move_shape(&self.collider, filter, delta, movement.to_network());
+            let translation = self.character_controller.move_shape(
+                &self.collider,
+                filter,
+                delta,
+                movement.to_network(),
+            );
             move_shape_elapsed = move_shape_now.elapsed();
 
-            self.collider.set_position(self.collider.get_position() + translation);
+            self.collider
+                .set_position(self.collider.get_position() + translation);
 
             let vision_now = std::time::Instant::now();
             let hit = self.update_vision();
@@ -430,10 +452,15 @@ impl PlayerController {
     fn update_cache_movement(&mut self) {
         // Handle player movement
         let new_movement = Gd::<EntityMovement>::from_init_fn(|_base| {
-            EntityMovement::create(self.get_position(), Rotation::new(self.get_yaw(), self.get_pitch()))
+            EntityMovement::create(
+                self.get_position(),
+                Rotation::new(self.get_yaw(), self.get_pitch()),
+            )
         });
 
-        if self.cache_movement.is_none() || *new_movement.bind() != *self.cache_movement.as_ref().unwrap().bind() {
+        if self.cache_movement.is_none()
+            || *new_movement.bind() != *self.cache_movement.as_ref().unwrap().bind()
+        {
             let new_chunk = if let Some(old) = self.cache_movement.as_ref() {
                 let c1 = old.bind().get_position().to_chunk_position();
                 let c2 = new_movement.bind().get_position().to_chunk_position();

@@ -26,6 +26,8 @@ pub enum PhysicsType {
 #[derive(Default, Clone)]
 pub struct PhysicsProxy {
     physics_container: PhysicsContainer,
+
+    // В качестве ключа индекс коллайдера из get_index
     collider_type_map: Arc<RwLock<AHashMap<usize, PhysicsType>>>,
 }
 
