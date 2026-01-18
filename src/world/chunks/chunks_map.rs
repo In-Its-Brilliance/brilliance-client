@@ -124,6 +124,15 @@ impl ChunkMap {
             return;
         }
 
+        if sections.len() == 0 {
+            log::error!(
+                target: "chunk_map",
+                "Recieved empty ChunkData for chunk_position: {}",
+                chunk_position
+            );
+            return;
+        }
+
         let chunk_column = ChunkColumn::create(chunk_position, sections);
         self.chunks
             .insert(chunk_position.clone(), Arc::new(RwLock::new(chunk_column)));
