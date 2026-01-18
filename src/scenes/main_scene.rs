@@ -81,7 +81,11 @@ pub struct MainScene {
 }
 
 impl MainScene {
-    pub fn create(ip_port: String, login: String, game_settings: Rc<RefCell<GameSettings>>) -> Gd<Self> {
+    pub fn create(
+        ip_port: String,
+        login: String,
+        game_settings: Rc<RefCell<GameSettings>>,
+    ) -> Gd<Self> {
         rayon::ThreadPoolBuilder::new()
             .num_threads(MAX_THREADS)
             .build_global()
@@ -142,7 +146,9 @@ impl MainScene {
 
     pub fn send_disconnect_event(&mut self, message: String) {
         Input::singleton().set_mouse_mode(MouseMode::VISIBLE);
-        self.signals().network_disconnect().emit(&message.to_godot());
+        self.signals()
+            .network_disconnect()
+            .emit(&message.to_godot());
     }
 
     /// Signaling that everything is loaded from the server
@@ -150,7 +156,8 @@ impl MainScene {
         self.debug_info.bind_mut().toggle(true);
 
         let rm = self.resource_manager.clone();
-        self.get_worlds_manager_mut().on_network_connected(&*rm.borrow());
+        self.get_worlds_manager_mut()
+            .on_network_connected(&*rm.borrow());
     }
 
     /// Player can teleport in new world, between worlds or in exsting world
@@ -199,7 +206,10 @@ impl MainScene {
     #[func]
     fn handler_player_move(&mut self, movement: Gd<EntityMovement>, _new_chunk: bool) {
         let network = self.get_network().unwrap();
-        network.send_message(NetworkMessageType::Unreliable, &movement.bind().into_network());
+        network.send_message(
+            NetworkMessageType::Unreliable,
+            &movement.bind().into_network(),
+        );
     }
 
     #[func]
@@ -291,22 +301,28 @@ impl MainScene {
     fn regenerate_debug_world(&mut self, _value: bool) {
         log::info!(target: "main", "Regenerate debug world");
 
-        let Some(settings_file) = FileAccess::open(&self.debug_world_settings.to_string(), ModeFlags::READ) else {
+        let Some(settings_file) =
+            FileAccess::open(&self.debug_world_settings.to_string(), ModeFlags::READ)
+        else {
             log::error!(
                 "World settings file {} not found",
                 self.debug_world_settings.to_string()
             );
             return;
         };
-        let settings: WorldGeneratorSettings = match serde_yaml::from_str(&settings_file.get_as_text().to_string()) {
-            Ok(s) => s,
-            Err(e) => {
-                log::error!("World settings yaml error: {}", e);
-                return;
-            }
-        };
+        let settings: WorldGeneratorSettings =
+            match serde_yaml::from_str(&settings_file.get_as_text().to_string()) {
+                Ok(s) => s,
+                Err(e) => {
+                    log::error!("World settings yaml error: {}", e);
+                    return;
+                }
+            };
 
-        let wm = self.worlds_manager.as_mut().expect("worlds_manager is not init");
+        let wm = self
+            .worlds_manager
+            .as_mut()
+            .expect("worlds_manager is not init");
 
         {
             let wm = wm.bind_mut();
@@ -342,7 +358,10 @@ impl MainScene {
                                 SelectedItem::BlockPlacing(block_info) => {
                                     let msg = ClientMessages::EditBlockRequest {
                                         world_slug: a.get_world_slug().clone(),
-                                        position: look_at.bind().get_cast_result().get_place_block(),
+                                        position: look_at
+                                            .bind()
+                                            .get_cast_result()
+                                            .get_place_block(),
                                         new_block_info: Some(block_info.clone()),
                                     };
                                     network.send_message(NetworkMessageType::Unreliable, &msg);
@@ -370,7 +389,12 @@ impl INode for MainScene {
         let gd = self.to_gd().clone();
         log::set_max_level(LOG_LEVEL);
         log::info!(target: "main", "Start loading local resources");
-        if let Err(e) = self.resource_manager.clone().borrow_mut().load_local_resources() {
+        if let Err(e) = self
+            .resource_manager
+            .clone()
+            .borrow_mut()
+            .load_local_resources()
+        {
             self.send_disconnect_event(format!("Internal resources error: {}", e));
             return;
         }
@@ -383,7 +407,11 @@ impl INode for MainScene {
             self.regenerate_debug_world(false);
         } else {
             // Debug
-            let debug_info = self.debug_info_scene.as_mut().unwrap().instantiate_as::<DebugInfo>();
+            let debug_info = self
+                .debug_info_scene
+                .as_mut()
+                .unwrap()
+                .instantiate_as::<DebugInfo>();
             self.debug_info.init(debug_info);
 
             let debug_info = self.debug_info.clone();
@@ -407,7 +435,11 @@ impl INode for MainScene {
             self.debug_info.bind_mut().toggle(false);
 
             // Text splash screen
-            let text_screen = self.text_screen_scene.as_mut().unwrap().instantiate_as::<TextScreen>();
+            let text_screen = self
+                .text_screen_scene
+                .as_mut()
+                .unwrap()
+                .instantiate_as::<TextScreen>();
             self.text_screen.init(text_screen);
 
             let text_screen = self.text_screen.clone();

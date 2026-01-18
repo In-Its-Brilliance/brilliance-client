@@ -53,7 +53,7 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
         return Err(error);
     }
 
-    let mut chunks: Vec<ChunkPosition> = Default::default();
+    let mut recieved_chunks: Vec<ChunkPosition> = Default::default();
 
     // Recieve decoded server messages from network thread
     for event in network.iter_server_messages() {
@@ -244,7 +244,7 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
                     continue;
                 };
                 world.bind_mut().recieve_chunk(center, chunk_position, sections);
-                chunks.push(chunk_position);
+                recieved_chunks.push(chunk_position);
             }
             ServerMessages::UnloadChunks { chunks, world_slug } => {
                 let mut worlds_manager = main.get_worlds_manager_mut();
@@ -329,9 +329,10 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
         }
     }
 
-    if chunks.len() > 0 {
+    if recieved_chunks.len() > 0 {
+        // log::info!(target: "network", "recieved_chunks: {}", recieved_chunks.len());
         let input = ClientMessages::ChunkRecieved {
-            chunk_positions: chunks,
+            chunk_positions: recieved_chunks,
         };
         network.send_message(NetworkMessageType::WorldInfo, &input);
     }

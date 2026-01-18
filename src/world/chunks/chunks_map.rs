@@ -138,7 +138,7 @@ impl ChunkMap {
             .insert(chunk_position.clone(), Arc::new(RwLock::new(chunk_column)));
 
         if self.waiting_chunks.borrow().contains(&chunk_position) {
-            panic!("waiting_chunks already have chunk");
+            panic!("waiting_chunks already have chunk {}", chunk_position);
         }
         self.waiting_chunks.borrow_mut().push(chunk_position);
 
