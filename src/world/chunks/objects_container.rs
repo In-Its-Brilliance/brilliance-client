@@ -106,7 +106,7 @@ impl ObjectsContainer {
         resource_storage: &ResourceStorage,
     ) -> Result<(), String> {
         for (block_index, block_info) in chunk_data.iter() {
-            let chunk_block_position = ChunkBlockPosition::delinearize(*block_index);
+            let chunk_block_position = ChunkBlockPosition::delinearize(block_index as u16);
             let Some(block_type) = block_storage.get(&block_info.get_id()) else {
                 continue;
             };
