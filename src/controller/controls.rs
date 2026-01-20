@@ -146,6 +146,12 @@ impl INode for Controls {
     }
 
     fn process(&mut self, delta: f64) {
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("controls.process");
+
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("controls.process");
+
         let captured = Input::singleton().get_mouse_mode() == MouseMode::CAPTURED;
         if self.window_focus && captured {
             self.cam_rot.x += self.joyaxis_right.x * delta as f32 * JOYAXIS_SENSITIVITY;

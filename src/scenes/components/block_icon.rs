@@ -194,6 +194,12 @@ impl IControl for BlockIcon {
     }
 
     fn process(&mut self, _delta: f64) {
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("block_icon.process");
+
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("block_icon.process");
+
         if self.item_description.is_some() {
             let mouse_position = self.base().get_viewport().unwrap().get_mouse_position();
             let item_description = self.item_description.as_mut().unwrap();

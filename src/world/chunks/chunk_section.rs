@@ -185,6 +185,12 @@ impl INode3D for ChunkSection {
     }
 
     fn process(&mut self, delta: f64) {
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("chunk_section.process");
+
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("chunk_section.process");
+
         if self.transparancy > 0.0 {
             let mesh = self.mesh.borrow_mut();
             self.transparancy -= TRANSPARENCY_SPEED * delta as f32;

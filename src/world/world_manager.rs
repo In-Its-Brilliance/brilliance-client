@@ -139,12 +139,11 @@ impl WorldManager {
         #[cfg(feature = "trace")]
         let _span = crate::debug::PROFILER.span("world_manager.custom_process");
 
-        let mut map = self.chunk_map.bind_mut();
-
         {
             #[cfg(feature = "trace")]
             let _s = crate::debug::PROFILER.span("world_manager.custom_process::to_load");
 
+            let map = self.chunk_map.bind();
             map.send_chunks_to_load(
                 &self.materials,
                 self.texture_mapper.clone(),
@@ -158,6 +157,7 @@ impl WorldManager {
             #[cfg(feature = "trace")]
             let _s = crate::debug::PROFILER.span("world_manager.custom_process::spawn");
 
+            let mut map = self.chunk_map.bind_mut();
             map.spawn_loaded_chunks(&self.physics);
         }
 
@@ -167,6 +167,7 @@ impl WorldManager {
 
             let bs = self.block_storage.read();
             let tm = self.texture_mapper.read();
+            let map = self.chunk_map.bind();
             map.update_chunks_geometry(&self.physics, &bs, &tm);
         }
     }

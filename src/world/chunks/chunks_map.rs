@@ -157,7 +157,7 @@ impl ChunkMap {
     ///
     /// Can be sended only if all bordered chunks are loaded
     pub fn send_chunks_to_load(
-        &mut self,
+        &self,
         materials: &WorldMaterials,
         texture_mapper: TextureMapperType,
         block_storage: BlockStorageType,

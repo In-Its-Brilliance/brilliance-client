@@ -233,10 +233,10 @@ impl INode for WorldsManager {
 
     fn physics_process(&mut self, delta: f64) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("worlds_manager.ready");
+        let _span = tracy_client::span!("worlds_manager.physics_process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("worlds_manager.ready");
+        let _span = crate::debug::PROFILER.span("worlds_manager.physics_process");
 
         if self.get_world().is_some() {
             let mut world = self.get_world_mut().unwrap().clone();
@@ -245,6 +245,12 @@ impl INode for WorldsManager {
     }
 
     fn process(&mut self, delta: f64) {
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("worlds_manager.process");
+
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("worlds_manager.process");
+
         if self.get_world().is_some() {
             let mut world = self.get_world_mut().unwrap().clone();
 
