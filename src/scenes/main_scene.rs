@@ -18,9 +18,10 @@ use crate::{LOG_LEVEL, MAX_THREADS};
 use common::blocks::block_info::generate_block_id_map;
 use common::chunks::chunk_data::BlockIndexType;
 use common::world_generator::default::WorldGeneratorSettings;
+use godot::classes::display_server::VSyncMode;
 use godot::classes::file_access::ModeFlags;
 use godot::classes::input::MouseMode;
-use godot::classes::{Engine, FileAccess, Input, WorldEnvironment};
+use godot::classes::{DisplayServer, Engine, FileAccess, Input, WorldEnvironment};
 use godot::prelude::*;
 use network::messages::{ClientMessages, NetworkMessageType};
 use std::cell::RefCell;
@@ -258,7 +259,7 @@ impl MainScene {
                     log::info!(target: "main", "&aSetting SSAO changed to &2{}", settings.ssao);
                     return;
                 }
-                "fps" => {
+                "max-fps" => {
                     let value = match command.get_arg::<u16, _>("value") {
                         Ok(c) => c,
                         Err(e) => {
@@ -270,6 +271,24 @@ impl MainScene {
                     Engine::singleton().set_max_fps(settings.max_fps as i32);
                     settings.save().unwrap();
                     log::info!(target: "main", "&aSetting max FPS changed to &2{}", settings.max_fps);
+                    return;
+                }
+                "vsync" => {
+                    let value = match command.get_arg::<bool, _>("value") {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log::error!(target: "main", "&cSetting value error: {}", e);
+                            return;
+                        }
+                    };
+                    settings.vsync = value;
+                    if settings.vsync {
+                        DisplayServer::singleton().window_set_vsync_mode(VSyncMode::ENABLED);
+                    } else {
+                        DisplayServer::singleton().window_set_vsync_mode(VSyncMode::DISABLED);
+                    }
+                    settings.save().unwrap();
+                    log::info!(target: "main", "&aSetting vsync changed to &2{}", settings.max_fps);
                     return;
                 }
                 _ => {
@@ -429,6 +448,11 @@ impl INode for MainScene {
                 environment.set_ssao_enabled(settings.ssao);
             }
             Engine::singleton().set_max_fps(settings.max_fps as i32);
+            if settings.vsync {
+                DisplayServer::singleton().window_set_vsync_mode(VSyncMode::ENABLED);
+            } else {
+                DisplayServer::singleton().window_set_vsync_mode(VSyncMode::DISABLED);
+            }
         }
 
         let mut wm = self.worlds_manager.clone();
@@ -441,9 +465,10 @@ impl INode for MainScene {
 
     fn process(&mut self, _delta: f64) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("main_scene");
+        let _span = tracy_client::span!("main_scene.process");
 
-        let now = std::time::Instant::now();
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("main_scene.process");
 
         if self.network.is_some() {
             let network_info = match handle_network_events(self) {
@@ -469,11 +494,8 @@ impl INode for MainScene {
             }
         }
 
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(target: "main", "&7process lag: {:.2?}", elapsed);
-        }
+        #[cfg(feature = "trace")]
+        crate::debug::runtime_storage::RUNTIME_STORAGE.lock().unwrap().flush();
     }
 
     fn exit_tree(&mut self) {

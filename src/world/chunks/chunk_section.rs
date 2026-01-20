@@ -2,7 +2,9 @@ use super::objects_container::ObjectsContainer;
 use crate::{
     utils::bridge::{GodotPositionConverter, IntoNetworkVector},
     world::{
-        physics::{PhysicsProxy, PhysicsType}, world_manager::{PLAYER_GROUP, WORLD_FAR_GROUP, WORLD_NEAR_GROUP}, worlds_manager::WorldMaterials
+        physics::{PhysicsProxy, PhysicsType},
+        world_manager::{PLAYER_GROUP, WORLD_FAR_GROUP, WORLD_NEAR_GROUP},
+        worlds_manager::WorldMaterials,
     },
 };
 use common::{

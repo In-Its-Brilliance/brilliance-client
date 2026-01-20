@@ -153,9 +153,10 @@ impl INode3D for Entity {
 
     fn process(&mut self, _delta: f64) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("entity");
+        let _span = tracy_client::span!("entity.process");
 
-        let now = std::time::Instant::now();
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("entity.process");
 
         // target_position is onlt for network sync
         if let Some(target_position) = self.target_position {
@@ -179,12 +180,6 @@ impl INode3D for Entity {
             if new_position == target_position {
                 self.target_position = None;
             }
-        }
-
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(target: "entity", "&7process lag: {:.2?}", elapsed);
         }
     }
 }

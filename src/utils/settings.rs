@@ -14,6 +14,9 @@ pub struct GameSettings {
 
     #[serde(default)]
     pub max_fps: u16,
+
+    #[serde(default)]
+    pub vsync: bool,
 }
 
 impl GameSettings {

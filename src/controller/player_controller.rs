@@ -348,20 +348,21 @@ impl PlayerController {
 
     pub fn custom_process(&mut self, delta: f64, chunk_loaded: bool, world_slug: &String) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("player_controller");
+        let _span = tracy_client::span!("player_controller.custom_process");
 
-        let now = std::time::Instant::now();
-        let mut move_shape_elapsed: std::time::Duration = std::time::Duration::ZERO;
-        let mut detect_is_grounded_elapsed: std::time::Duration = std::time::Duration::ZERO;
-        let mut vision_elapsed: std::time::Duration = std::time::Duration::ZERO;
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("player_controller.custom_process");
 
         // Set lock if chunk is in loading
         self.collider.set_enabled(chunk_loaded);
 
         if chunk_loaded {
-            let detect_is_grounded_now = std::time::Instant::now();
-            self.detect_is_grounded(delta);
-            detect_is_grounded_elapsed = detect_is_grounded_now.elapsed();
+            {
+                #[cfg(feature = "trace")]
+                let _s = crate::debug::PROFILER.span("player_controller.custom_process::detect_is_grounded");
+
+                self.detect_is_grounded(delta);
+            }
 
             let movement = self.get_movement(delta);
 
@@ -370,18 +371,23 @@ impl PlayerController {
             filter.exclude_collider(&self.collider);
             filter.collision_mask(PLAYER_GROUP, WORLD_NEAR_GROUP);
 
-            let move_shape_now = std::time::Instant::now();
-            let translation =
+            let translation = {
+                #[cfg(feature = "trace")]
+                let _s = crate::debug::PROFILER.span("player_controller.custom_process::move_shape");
+
                 self.character_controller
-                    .move_shape(&self.collider, filter, delta, movement.to_network());
-            move_shape_elapsed = move_shape_now.elapsed();
+                    .move_shape(&self.collider, filter, delta, movement.to_network())
+            };
 
             self.collider.set_position(self.collider.get_position() + translation);
 
-            let vision_now = std::time::Instant::now();
-            let hit = self.update_vision();
+            let hit = {
+                #[cfg(feature = "trace")]
+                let _s = crate::debug::PROFILER.span("player_controller.custom_process::update_vision");
+
+                self.update_vision()
+            };
             self.signals().look_at_update().emit(hit.as_ref());
-            vision_elapsed = vision_now.elapsed();
 
             let action_type = if self.controls.bind().is_main_action() {
                 Some(PlayerActionType::Main)
@@ -413,16 +419,6 @@ impl PlayerController {
             physics_pos.y - CONTROLLER_HEIGHT / 2.0,
             physics_pos.z,
         ));
-
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(
-                target: "player_controller",
-                "&7custom_process lag:{:.2?} move_shape:{:.2?} detect_is_grounded:{:.2?} vision:{:.2?}",
-                elapsed, move_shape_elapsed, detect_is_grounded_elapsed, vision_elapsed,
-            );
-        }
     }
 
     fn update_cache_movement(&mut self) {
@@ -567,9 +563,10 @@ impl INode3D for PlayerController {
 
     fn process(&mut self, delta: f64) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("player_controller");
+        let _span = tracy_client::span!("player_controller.process");
 
-        let now = std::time::Instant::now();
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("player_controller.process");
 
         self.ui_lock = (self.ui_lock - delta as f32).max(0.0);
 
@@ -614,11 +611,5 @@ impl INode3D for PlayerController {
         }
 
         self.update_cache_movement();
-
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(target: "player_controller", "&7process lag: {:.2?}", elapsed);
-        }
     }
 }

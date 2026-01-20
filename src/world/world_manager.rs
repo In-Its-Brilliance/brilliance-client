@@ -124,51 +124,50 @@ impl WorldManager {
         }
 
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("physics_step");
+        let _span = tracy_client::span!("world_manager.physics_process");
 
-        let now = std::time::Instant::now();
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("world_manager.physics_process");
 
         self.physics.step(delta as f32);
-
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(target: "world_manager", "&7physics_process lag: {:.2?}", elapsed);
-        }
     }
 
     pub fn custom_process(&mut self, _delta: f64, resource_manager: &ResourceManager) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("world_manager");
+        let _span = tracy_client::span!("world_manager.custom_process");
 
-        let now = std::time::Instant::now();
+        #[cfg(feature = "trace")]
+        let _span = crate::debug::PROFILER.span("world_manager.custom_process");
 
         let mut map = self.chunk_map.bind_mut();
 
-        let to_load_now = std::time::Instant::now();
-        map.send_chunks_to_load(
-            &self.materials,
-            self.texture_mapper.clone(),
-            self.block_storage.clone(),
-            &self.physics,
-            resource_manager,
-        );
-        let to_load_elapsed = to_load_now.elapsed();
+        {
+            #[cfg(feature = "trace")]
+            let _s = crate::debug::PROFILER.span("world_manager.custom_process::to_load");
 
-        let spawn_now = std::time::Instant::now();
-        map.spawn_loaded_chunks(&self.physics);
-        let spawn_elapsed = spawn_now.elapsed();
+            map.send_chunks_to_load(
+                &self.materials,
+                self.texture_mapper.clone(),
+                self.block_storage.clone(),
+                &self.physics,
+                resource_manager,
+            );
+        }
 
-        let geometry_now = std::time::Instant::now();
-        let bs = self.block_storage.read();
-        let tm = self.texture_mapper.read();
-        map.update_chunks_geometry(&self.physics, &bs, &tm);
-        let geometry_elapsed = geometry_now.elapsed();
+        {
+            #[cfg(feature = "trace")]
+            let _s = crate::debug::PROFILER.span("world_manager.custom_process::spawn");
 
-        let elapsed = now.elapsed();
-        #[cfg(debug_assertions)]
-        if elapsed >= crate::WARNING_TIME {
-            log::warn!(target: "world_manager", "&7custom_process lag:{:.2?} geometry:{:.2?} spawn:{:.2?} to_load:{:.2?}", elapsed, geometry_elapsed, spawn_elapsed, to_load_elapsed);
+            map.spawn_loaded_chunks(&self.physics);
+        }
+
+        {
+            #[cfg(feature = "trace")]
+            let _s = crate::debug::PROFILER.span("world_manager.custom_process::update_geometry");
+
+            let bs = self.block_storage.read();
+            let tm = self.texture_mapper.read();
+            map.update_chunks_geometry(&self.physics, &bs, &tm);
         }
     }
 }

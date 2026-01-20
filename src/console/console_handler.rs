@@ -1,21 +1,22 @@
 use chrono::Local;
 use common::commands::command::{Arg, Command, CommandMatch};
-use common::commands::complitions::{CompleteRequest, CompleteResponse, apply_complete};
+use common::commands::complitions::{apply_complete, CompleteRequest, CompleteResponse};
 use common::utils::colors::parse_to_console_godot;
 use flume::unbounded;
 use flume::{Receiver, Sender};
 use godot::classes::{InputEvent, InputEventKey};
 use godot::global::Key;
 use godot::{
-    classes::{IMarginContainer, Input, LineEdit, MarginContainer, RichTextLabel, TextureButton, input::MouseMode},
+    classes::{input::MouseMode, IMarginContainer, Input, LineEdit, MarginContainer, RichTextLabel, TextureButton},
     prelude::*,
 };
 use lazy_static::lazy_static;
 use std::sync::{
-    Arc,
     atomic::{AtomicBool, Ordering},
+    Arc,
 };
 
+const MAX_LINES: i32 = 200;
 const CONSOLE_SCENE_PATH: &str = "res://scenes/console.tscn";
 
 fn get_commands() -> Vec<Command> {
@@ -27,7 +28,7 @@ fn get_commands() -> Vec<Command> {
     let c = Command::new("disconnect".to_string());
     commands.push(c);
 
-    let setting_choices = vec!["ssao", "fps"];
+    let setting_choices = vec!["ssao", "max-fps", "vsync"];
     let c = Command::new("setting".to_string())
         .arg(Arg::new("name".to_owned()).required(true).choices(setting_choices))
         .arg(Arg::new("value".to_owned()).required(true));
@@ -128,10 +129,23 @@ impl Console {
     }
 
     fn append_text(&mut self, message: String) {
-        self.console_text
-            .as_mut()
-            .unwrap()
-            .append_text(&format!("\n{}", message));
+        let console_text = self.console_text.as_mut().unwrap();
+        console_text.append_text(&format!("\n{}", message));
+
+        let line_count = console_text.get_line_count();
+        if line_count > MAX_LINES {
+            let mut lines: Vec<String> = console_text
+                .get_text()
+                .to_string()
+                .lines()
+                .map(|s| s.to_string())
+                .collect();
+
+            let overflow = (line_count - MAX_LINES) as usize;
+            lines.drain(0..overflow);
+            console_text.set_text(&lines.join("\n"));
+        }
+
         self.scroll_to_bottom();
     }
 
