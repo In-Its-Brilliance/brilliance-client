@@ -471,17 +471,27 @@ impl INode for MainScene {
         let _span = crate::debug::PROFILER.span("main_scene.process");
 
         if self.network.is_some() {
-            let network_info = match handle_network_events(self) {
-                Ok(i) => i,
-                Err(e) => {
-                    log::error!(target: "main", "Network error: {}", e);
-                    self.send_disconnect_event(format!("Network error: {}", e));
-                    return;
+            let network_info = {
+                #[cfg(feature = "trace")]
+                let _s = crate::debug::PROFILER.span("main_scene.process::handle_network_events");
+
+                match handle_network_events(self) {
+                    Ok(i) => i,
+                    Err(e) => {
+                        log::error!(target: "main", "Network error: {}", e);
+                        self.send_disconnect_event(format!("Network error: {}", e));
+                        return;
+                    }
                 }
             };
 
-            let wm = self.worlds_manager.as_ref().unwrap();
-            self.debug_info.bind_mut().update_debug(wm, network_info);
+            {
+                #[cfg(feature = "trace")]
+                let _s = crate::debug::PROFILER.span("main_scene.process::update_debug");
+
+                let wm = self.worlds_manager.as_ref().unwrap();
+                self.debug_info.bind_mut().update_debug(wm, network_info);
+            }
         }
 
         if !Engine::singleton().is_editor_hint() {

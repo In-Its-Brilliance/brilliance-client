@@ -31,7 +31,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 const MAX_CHUNKS_SPAWN_PER_FRAME: i32 = 6;
-pub const LIMIT_CHUNK_LOADING_AT_A_TIME: u32 = 16;
+pub const LIMIT_CHUNK_LOADING_AT_A_TIME: usize = 16;
 
 pub type ChunkLock = Arc<RwLock<ChunkColumn>>;
 pub type ChunksType = AHashMap<ChunkPosition, ChunkLock>;
@@ -45,12 +45,16 @@ pub struct ChunkMap {
     // Hash map with chunk columns
     chunks: ChunksType,
 
-    waiting_chunks: Rc<RefCell<Vec<ChunkPosition>>>,
+    // chunk waiting for all four neighbors
+    recieved_chunks: Rc<RefCell<Vec<ChunkPosition>>>,
+
+    // Limited queue by LIMIT_CHUNK_LOADING_AT_A_TIME
+    loading_queue: Rc<RefCell<Vec<ChunkPosition>>>,
+
+    // Loaded chunks waiting to be added to tree
     chunks_to_spawn: (Sender<ChunkLock>, Receiver<ChunkLock>),
 
     chunks_to_update: Rc<RefCell<HashSet<(ChunkPosition, usize)>>>,
-
-    loading_chunks: RefCell<u32>,
 }
 
 #[godot_api]
@@ -64,10 +68,12 @@ impl ChunkMap {
         Self {
             base,
             chunks: Default::default(),
-            waiting_chunks: Default::default(),
+
+            recieved_chunks: Default::default(),
+            loading_queue: Default::default(),
             chunks_to_spawn: unbounded(),
+
             chunks_to_update: Default::default(),
-            loading_chunks: Default::default(),
         }
     }
 
@@ -84,14 +90,20 @@ impl ChunkMap {
     }
 
     pub fn get_waiting_chunks_count(&self) -> usize {
-        self.waiting_chunks.borrow().len()
+        self.recieved_chunks.borrow().len()
     }
 
-    pub fn get_loading_chunks_count(&self) -> u32 {
-        *self.loading_chunks.borrow()
+    pub fn get_loading_chunks_count(&self) -> usize {
+        self.loading_queue.borrow().len() + self.chunks_to_spawn.1.len()
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, ChunkPosition, Arc<parking_lot::lock_api::RwLock<parking_lot::RawRwLock, ChunkColumn>>> {
+    pub fn iter(
+        &self,
+    ) -> std::collections::hash_map::Iter<
+        '_,
+        ChunkPosition,
+        Arc<parking_lot::lock_api::RwLock<parking_lot::RawRwLock, ChunkColumn>>,
+    > {
         self.chunks.iter()
     }
 
@@ -102,10 +114,7 @@ impl ChunkMap {
         }
     }
 
-    pub fn _get_chunk_column_data(
-        &self,
-        chunk_position: &ChunkPosition,
-    ) -> Option<ColumnDataLockType> {
+    pub fn _get_chunk_column_data(&self, chunk_position: &ChunkPosition) -> Option<ColumnDataLockType> {
         match self.chunks.get(chunk_position) {
             Some(c) => Some(c.read().get_data_lock().clone()),
             None => None,
@@ -113,12 +122,7 @@ impl ChunkMap {
     }
 
     /// Create chunk column and send it to render queue
-    pub fn create_chunk_column(
-        &mut self,
-        center: ChunkPosition,
-        chunk_position: ChunkPosition,
-        sections: ChunkData,
-    ) {
+    pub fn create_chunk_column(&mut self, center: ChunkPosition, chunk_position: ChunkPosition, sections: ChunkData) {
         if self.chunks.contains_key(&chunk_position) {
             log::error!(
                 target: "chunk_map",
@@ -141,21 +145,39 @@ impl ChunkMap {
         self.chunks
             .insert(chunk_position.clone(), Arc::new(RwLock::new(chunk_column)));
 
-        if self.waiting_chunks.borrow().contains(&chunk_position) {
-            panic!("waiting_chunks already have chunk {}", chunk_position);
+        if self.recieved_chunks.borrow().contains(&chunk_position) {
+            panic!("recieved_chunks already have chunk {}", chunk_position);
         }
-        self.waiting_chunks.borrow_mut().push(chunk_position);
+        self.recieved_chunks.borrow_mut().push(chunk_position);
 
-        self.waiting_chunks.borrow_mut().sort_by(|a, b| {
+        self.recieved_chunks.borrow_mut().sort_by(|a, b| {
             a.get_distance(&center)
                 .partial_cmp(&b.get_distance(&center))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        self.update_loading_queue();
     }
 
-    /// Send new recieved chunks to load (render)
-    ///
-    /// Can be sended only if all bordered chunks are loaded
+    /// Отправляет все чанки с соседями в очередь на загрузку
+    pub fn update_loading_queue(&self) {
+        self.recieved_chunks.borrow_mut().retain(|chunk_position| {
+            let near_chunks_data = NearChunksData::new(&self.chunks, &chunk_position);
+
+            // Load only if all chunks around are loaded
+            if !near_chunks_data.is_full() {
+                return true;
+            }
+            
+            if self.get_chunk(chunk_position).is_none() {
+                // Remove if chunk is not existing for some reason
+                return false;
+            };
+
+            self.loading_queue.borrow_mut().push(chunk_position.clone());
+            return false;
+        });
+    }
+
     pub fn send_chunks_to_load(
         &self,
         materials: &WorldMaterials,
@@ -164,12 +186,10 @@ impl ChunkMap {
         physics: &PhysicsProxy,
         resource_manager: &ResourceManager,
     ) {
-        if *self.loading_chunks.borrow() > LIMIT_CHUNK_LOADING_AT_A_TIME {
-            return;
-        }
+        let mut loading_len = self.loading_queue.borrow().len();
 
-        self.waiting_chunks.borrow_mut().retain(|chunk_position| {
-            if *self.loading_chunks.borrow() > LIMIT_CHUNK_LOADING_AT_A_TIME {
+        self.loading_queue.borrow_mut().retain(|chunk_position| {
+            if loading_len > LIMIT_CHUNK_LOADING_AT_A_TIME {
                 return true;
             }
 
@@ -195,7 +215,7 @@ impl ChunkMap {
                 physics.clone(),
                 resource_manager,
             );
-            *self.loading_chunks.borrow_mut() += 1;
+            loading_len += 1;
             return false;
         });
     }
@@ -226,7 +246,6 @@ impl ChunkMap {
                         section.bind_mut().update_collider(physics);
                     }
                 }
-                *self.loading_chunks.borrow_mut() -= 1;
 
                 i += 1;
             } else {
@@ -243,9 +262,14 @@ impl ChunkMap {
         }
 
         if unloaded {
-            let mut waiting = self.waiting_chunks.borrow_mut();
-            if let Some(i) = waiting.iter().position(|c| *c == chunk_position) {
-                waiting.swap_remove(i);
+            let mut recieved_chunks = self.recieved_chunks.borrow_mut();
+            if let Some(i) = recieved_chunks.iter().position(|c| *c == chunk_position) {
+                recieved_chunks.swap_remove(i);
+            }
+
+            let mut loading_queue = self.loading_queue.borrow_mut();
+            if let Some(i) = loading_queue.iter().position(|c| *c == chunk_position) {
+                loading_queue.swap_remove(i);
             }
         }
 
@@ -300,10 +324,7 @@ impl ChunkMap {
 
         if let Some(new_block_info) = new_block_info {
             let Some(new_block_type) = block_storage.get(&new_block_info.get_id()) else {
-                return Err(format!(
-                    "edit block id #{} not found",
-                    new_block_info.get_id()
-                ));
+                return Err(format!("edit block id #{} not found", new_block_info.get_id()));
             };
 
             match new_block_type.get_block_content() {
@@ -364,30 +385,22 @@ impl ChunkMap {
 
         let x = position.get_chunk_position() + ChunkPosition::new(-1, 0);
         if block_position.x == 0 && self.get_chunk(&x).is_some() {
-            self.chunks_to_update
-                .borrow_mut()
-                .insert((x, section as usize));
+            self.chunks_to_update.borrow_mut().insert((x, section as usize));
         }
 
         let x = position.get_chunk_position() + ChunkPosition::new(1, 0);
         if block_position.x == CHUNK_SIZE - 1 && self.get_chunk(&x).is_some() {
-            self.chunks_to_update
-                .borrow_mut()
-                .insert((x, section as usize));
+            self.chunks_to_update.borrow_mut().insert((x, section as usize));
         }
 
         let z = position.get_chunk_position() + ChunkPosition::new(0, -1);
         if block_position.z == 0 && self.get_chunk(&z).is_some() {
-            self.chunks_to_update
-                .borrow_mut()
-                .insert((z, section as usize));
+            self.chunks_to_update.borrow_mut().insert((z, section as usize));
         }
 
         let z = position.get_chunk_position() + ChunkPosition::new(0, 1);
         if block_position.z == CHUNK_SIZE - 1 && self.get_chunk(&z).is_some() {
-            self.chunks_to_update
-                .borrow_mut()
-                .insert((z, section as usize));
+            self.chunks_to_update.borrow_mut().insert((z, section as usize));
         }
     }
 
@@ -398,44 +411,37 @@ impl ChunkMap {
         block_storage: &BlockStorage,
         texture_mapper: &TextureMapper,
     ) {
-        self.chunks_to_update
-            .borrow_mut()
-            .retain(|(chunk_position, y)| {
-                let chunks_near = NearChunksData::new(&self.chunks, &chunk_position);
+        self.chunks_to_update.borrow_mut().retain(|(chunk_position, y)| {
+            let chunks_near = NearChunksData::new(&self.chunks, &chunk_position);
 
-                // Load only if all chunks around are loaded
-                if !chunks_near.is_full() {
-                    return true;
-                }
+            // Load only if all chunks around are loaded
+            if !chunks_near.is_full() {
+                return true;
+            }
 
-                let Some(chunk_column) = self.get_chunk(&chunk_position) else {
-                    // Remove if chunk is not existing for some reason
-                    return false;
-                };
-
-                let c = chunk_column.read();
-
-                let data = c.get_data_lock().clone();
-
-                let (bordered_chunk_data, _mesh_count) = format_chunk_data_with_boundaries(
-                    Some(&chunks_near),
-                    &data,
-                    &block_storage,
-                    y.clone(),
-                )
-                .unwrap();
-
-                let mut chunk_section = c.get_chunk_section(y);
-                generate_chunk_geometry(
-                    &mut chunk_section,
-                    &texture_mapper,
-                    &bordered_chunk_data,
-                    &block_storage,
-                );
-                if chunk_section.bind().is_collider_update_needed() {
-                    chunk_section.bind_mut().update_collider(physics);
-                }
+            let Some(chunk_column) = self.get_chunk(&chunk_position) else {
+                // Remove if chunk is not existing for some reason
                 return false;
-            });
+            };
+
+            let c = chunk_column.read();
+
+            let data = c.get_data_lock().clone();
+
+            let (bordered_chunk_data, _mesh_count) =
+                format_chunk_data_with_boundaries(Some(&chunks_near), &data, &block_storage, y.clone()).unwrap();
+
+            let mut chunk_section = c.get_chunk_section(y);
+            generate_chunk_geometry(
+                &mut chunk_section,
+                &texture_mapper,
+                &bordered_chunk_data,
+                &block_storage,
+            );
+            if chunk_section.bind().is_collider_update_needed() {
+                chunk_section.bind_mut().update_collider(physics);
+            }
+            return false;
+        });
     }
 }

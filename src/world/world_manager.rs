@@ -141,7 +141,7 @@ impl WorldManager {
 
         {
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span("world_manager.custom_process::to_load");
+            let _s = crate::debug::PROFILER.span("world_manager.custom_process::send_chunks_to_load");
 
             let map = self.chunk_map.bind();
             map.send_chunks_to_load(
