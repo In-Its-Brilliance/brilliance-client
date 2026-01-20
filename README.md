@@ -1,5 +1,10 @@
 # Godot client rust code
 
+## Release build
+``` shell
+cargo build --release --no-default-features --features use-git,trace
+```
+
 ## Run tests
 ```shell
 cargo test
