@@ -6,7 +6,9 @@ use super::{
 };
 use crate::{
     client_scripts::resource_manager::{ResourceManager, ResourceStorage},
+    controller::entity_movement::EntityMovement,
     entities::entities_manager::EntitiesManager,
+    utils::bridge::IntoChunkPositionVector,
 };
 use common::chunks::{
     block_position::BlockPosition,
@@ -14,6 +16,11 @@ use common::chunks::{
     chunk_position::ChunkPosition,
 };
 use godot::prelude::*;
+
+pub const PLAYER_GROUP: u32 = 0b0001;
+pub const WORLD_NEAR_GROUP: u32 = 0b0010;
+pub const WORLD_FAR_GROUP: u32 = 0b0100;
+pub const NEAR_DISTANCE: f32 = 2.0;
 
 /// Godot world
 /// Contains all things inside world
@@ -58,9 +65,7 @@ impl WorldManager {
 
             physics,
 
-            entities_manager: Gd::<EntitiesManager>::from_init_fn(|base| {
-                EntitiesManager::create(base)
-            }),
+            entities_manager: Gd::<EntitiesManager>::from_init_fn(|base| EntitiesManager::create(base)),
 
             texture_mapper,
             materials,
@@ -89,12 +94,7 @@ impl WorldManager {
     }
 
     /// Recieve chunk data from network
-    pub fn recieve_chunk(
-        &mut self,
-        center: ChunkPosition,
-        chunk_position: ChunkPosition,
-        data: ChunkData,
-    ) {
+    pub fn recieve_chunk(&mut self, center: ChunkPosition, chunk_position: ChunkPosition, data: ChunkData) {
         self.chunk_map
             .bind_mut()
             .create_chunk_column(center, chunk_position, data);
@@ -112,13 +112,9 @@ impl WorldManager {
         new_block_info: Option<BlockDataInfo>,
         resource_storage: &ResourceStorage,
     ) -> Result<(), String> {
-        self.chunk_map.bind().edit_block(
-            position,
-            block_storage,
-            new_block_info,
-            &self.physics,
-            resource_storage,
-        )
+        self.chunk_map
+            .bind()
+            .edit_block(position, block_storage, new_block_info, &self.physics, resource_storage)
     }
 
     pub fn physics_process(&mut self, delta: f64) {
@@ -178,7 +174,22 @@ impl WorldManager {
 }
 
 #[godot_api]
-impl WorldManager {}
+impl WorldManager {
+    #[func]
+    pub fn handler_player_move(&mut self, movement: Gd<EntityMovement>, new_chunk: bool) {
+        if !new_chunk {
+            return;
+        }
+        let new_chunk = movement.bind().get_position().to_chunk_position();
+        let chunk_map = self.chunk_map.bind();
+        for (_chunk_position, chunk_column_lock) in chunk_map.iter() {
+            let chunk_column = chunk_column_lock.read();
+            let is_near = chunk_column.get_position().to_chunk_position().get_distance(&new_chunk) < NEAR_DISTANCE;
+
+            chunk_column.update_collider_group(is_near);
+        }
+    }
+}
 
 #[godot_api]
 impl INode for WorldManager {

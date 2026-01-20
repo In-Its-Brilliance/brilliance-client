@@ -91,6 +91,10 @@ impl ChunkMap {
         *self.loading_chunks.borrow()
     }
 
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, ChunkPosition, Arc<parking_lot::lock_api::RwLock<parking_lot::RawRwLock, ChunkColumn>>> {
+        self.chunks.iter()
+    }
+
     pub fn get_chunk(&self, chunk_position: &ChunkPosition) -> Option<ChunkLock> {
         match self.chunks.get(chunk_position) {
             Some(c) => Some(c.clone()),
@@ -237,6 +241,14 @@ impl ChunkMap {
             chunk_column.write().free();
             unloaded = true;
         }
+
+        if unloaded {
+            let mut waiting = self.waiting_chunks.borrow_mut();
+            if let Some(i) = waiting.iter().position(|c| *c == chunk_position) {
+                waiting.swap_remove(i);
+            }
+        }
+
         if !unloaded {
             log::error!(target: "chunk_map", "Unload chunk not found: {}", chunk_position);
         }
@@ -382,7 +394,7 @@ impl ChunkMap {
     /// Every frame job to update edited chunks
     pub fn update_chunks_geometry(
         &self,
-        _physics: &PhysicsProxy,
+        physics: &PhysicsProxy,
         block_storage: &BlockStorage,
         texture_mapper: &TextureMapper,
     ) {
@@ -420,6 +432,9 @@ impl ChunkMap {
                     &bordered_chunk_data,
                     &block_storage,
                 );
+                if chunk_section.bind().is_collider_update_needed() {
+                    chunk_section.bind_mut().update_collider(physics);
+                }
                 return false;
             });
     }

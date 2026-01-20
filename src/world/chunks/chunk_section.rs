@@ -2,13 +2,12 @@ use super::objects_container::ObjectsContainer;
 use crate::{
     utils::bridge::{GodotPositionConverter, IntoNetworkVector},
     world::{
-        physics::{PhysicsProxy, PhysicsType},
-        worlds_manager::WorldMaterials,
+        physics::{PhysicsProxy, PhysicsType}, world_manager::{PLAYER_GROUP, WORLD_FAR_GROUP, WORLD_NEAR_GROUP}, worlds_manager::WorldMaterials
     },
 };
 use common::{
-    blocks::chunk_collider_info::ChunkColliderInfo, chunks::chunk_position::ChunkPosition,
-    CHUNK_SIZE, CHUNK_SIZE_BOUNDARY,
+    blocks::chunk_collider_info::ChunkColliderInfo, chunks::chunk_position::ChunkPosition, CHUNK_SIZE,
+    CHUNK_SIZE_BOUNDARY,
 };
 use godot::{
     classes::{ArrayMesh, MeshInstance3D},
@@ -25,8 +24,7 @@ use std::borrow::BorrowMut;
 const TRANSPARENCY_SPEED: f32 = 5.0;
 
 //pub type ChunkShape = ConstShape3u32<CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY>;
-pub type ChunkBordersShape =
-    ConstShape3u32<CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY>;
+pub type ChunkBordersShape = ConstShape3u32<CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY, CHUNK_SIZE_BOUNDARY>;
 
 //pub type ChunkData = [BlockInfo; ChunkShape::SIZE as usize];
 pub type ChunkColliderDataBordered = [ChunkColliderInfo; ChunkBordersShape::SIZE as usize];
@@ -54,12 +52,7 @@ pub struct ChunkSection {
 }
 
 impl ChunkSection {
-    pub fn create(
-        base: Base<Node3D>,
-        materials: &WorldMaterials,
-        y: u8,
-        chunk_position: ChunkPosition,
-    ) -> Self {
+    pub fn create(base: Base<Node3D>, materials: &WorldMaterials, y: u8, chunk_position: ChunkPosition) -> Self {
         let mut mesh = MeshInstance3D::new_alloc();
         mesh.set_name(&format!("ChunkMesh {}", y));
         mesh.set_material_override(&materials.get_material_3d());
@@ -113,8 +106,7 @@ impl ChunkSection {
     /// Updates the mesh from a separate thread
     pub fn set_new_mesh(&mut self, new_mesh: &Gd<ArrayMesh>, new_mesh_transparent: &Gd<ArrayMesh>) {
         // Set active only for sections that conatains vertices
-        let has_mesh =
-            new_mesh.get_surface_count() > 0 || new_mesh_transparent.get_surface_count() > 0;
+        let has_mesh = new_mesh.get_surface_count() > 0 || new_mesh_transparent.get_surface_count() > 0;
 
         let mesh = self.mesh.borrow_mut();
         mesh.set_mesh(new_mesh);
@@ -126,6 +118,17 @@ impl ChunkSection {
             self.set_geometry_first_time = true;
             self.transparancy = 1.0;
             mesh.set_transparency(self.transparancy);
+        }
+    }
+
+    pub fn update_collider_group(&self, is_near: bool) {
+        let Some(collider) = self.collider.as_ref() else {
+            return;
+        };
+        if is_near {
+            collider.set_collision_mask(WORLD_NEAR_GROUP, PLAYER_GROUP);
+        } else {
+            collider.set_collision_mask(WORLD_FAR_GROUP, 0);
         }
     }
 
@@ -146,6 +149,9 @@ impl ChunkSection {
                     colider_builder,
                     Some(PhysicsType::ChunkMeshCollider(self.chunk_position.clone())),
                 );
+                // Указание при создании коллайдера
+                collider.set_collision_mask(WORLD_NEAR_GROUP, PLAYER_GROUP);
+
                 let pos = self.get_section_position().clone();
                 collider.set_position(pos.to_network());
                 self.collider = Some(collider);
@@ -155,13 +161,6 @@ impl ChunkSection {
             if let Some(mut collider) = self.collider.take() {
                 collider.remove();
             }
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn set_active(&mut self, state: bool) {
-        if let Some(c) = self.collider.as_mut() {
-            c.set_enabled(state);
         }
     }
 

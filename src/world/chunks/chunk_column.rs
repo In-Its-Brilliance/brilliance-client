@@ -133,6 +133,15 @@ impl ChunkColumn {
         &self.data
     }
 
+    pub fn update_collider_group(&self, is_near: bool) {
+        let chunk_base = self.get_base();
+        let c = chunk_base.bind();
+
+        for section in c.sections.iter() {
+            section.bind().update_collider_group(is_near);
+        }
+    }
+
     pub fn is_loaded(&self) -> bool {
         self.loaded.load(Ordering::Relaxed)
     }
