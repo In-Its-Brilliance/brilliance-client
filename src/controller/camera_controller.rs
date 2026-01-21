@@ -110,7 +110,11 @@ impl INode3D for CameraController {
         let _span = tracy_client::span!("camera_controller.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("camera_controller.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("camera_controller.process"))
+        } else {
+            None
+        };
 
         let cam_rot = {
             let controls = self.controls.bind();

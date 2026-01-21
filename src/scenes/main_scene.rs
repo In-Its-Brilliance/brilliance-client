@@ -473,12 +473,20 @@ impl INode for MainScene {
         let _span = tracy_client::span!("main_scene.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("main_scene.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("main_scene.process"))
+        } else {
+            None
+        };
 
         if self.network.is_some() {
             let network_info = {
                 #[cfg(feature = "trace")]
-                let _s = crate::debug::PROFILER.span("main_scene.process::handle_network_events");
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("main_scene.process::handle_network_events"))
+                } else {
+                    None
+                };
 
                 match handle_network_events(self) {
                     Ok(i) => i,
@@ -492,7 +500,11 @@ impl INode for MainScene {
 
             {
                 #[cfg(feature = "trace")]
-                let _s = crate::debug::PROFILER.span("main_scene.process::update_debug");
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("main_scene.process::update_debug"))
+                } else {
+                    None
+                };
 
                 let wm = self.worlds_manager.as_ref().unwrap();
                 self.debug_info.bind_mut().update_debug(wm, network_info);

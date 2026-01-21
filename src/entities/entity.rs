@@ -156,7 +156,11 @@ impl INode3D for Entity {
         let _span = tracy_client::span!("entity.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("entity.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("entity.process"))
+        } else {
+            None
+        };
 
         // target_position is onlt for network sync
         if let Some(target_position) = self.target_position {

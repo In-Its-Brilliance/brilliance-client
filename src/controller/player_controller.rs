@@ -351,7 +351,11 @@ impl PlayerController {
         let _span = tracy_client::span!("player_controller.custom_process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("player_controller.custom_process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("player_controller.custom_process"))
+        } else {
+            None
+        };
 
         // Set lock if chunk is in loading
         self.collider.set_enabled(chunk_loaded);
@@ -359,7 +363,11 @@ impl PlayerController {
         if chunk_loaded {
             {
                 #[cfg(feature = "trace")]
-                let _s = crate::debug::PROFILER.span("player_controller.custom_process::detect_is_grounded");
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.custom_process::detect_is_grounded"))
+                } else {
+                    None
+                };
 
                 self.detect_is_grounded(delta);
             }
@@ -373,7 +381,11 @@ impl PlayerController {
 
             let translation = {
                 #[cfg(feature = "trace")]
-                let _s = crate::debug::PROFILER.span("player_controller.custom_process::move_shape");
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.custom_process::move_shape"))
+                } else {
+                    None
+                };
 
                 self.character_controller
                     .move_shape(&self.collider, filter, delta, movement.to_network())
@@ -383,7 +395,11 @@ impl PlayerController {
 
             let hit = {
                 #[cfg(feature = "trace")]
-                let _s = crate::debug::PROFILER.span("player_controller.custom_process::update_vision");
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.custom_process::update_vision"))
+                } else {
+                    None
+                };
 
                 self.update_vision()
             };
@@ -566,7 +582,11 @@ impl INode3D for PlayerController {
         let _span = tracy_client::span!("player_controller.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("player_controller.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("player_controller.process"))
+        } else {
+            None
+        };
 
         self.ui_lock = (self.ui_lock - delta as f32).max(0.0);
 

@@ -26,7 +26,7 @@ pub struct WorldMaterials {
 }
 
 impl WorldMaterials {
-    pub fn create(material_3d: Gd<Material>, material_3d_transparent: Gd<Material>) -> Self{
+    pub fn create(material_3d: Gd<Material>, material_3d_transparent: Gd<Material>) -> Self {
         Self {
             material_3d_id: material_3d.instance_id(),
             material_3d_transparent_id: material_3d_transparent.instance_id(),
@@ -83,10 +83,7 @@ impl WorldsManager {
             Err(e) => return Err(e),
         };
 
-        let material_3d = self
-            .terrain_material
-            .as_mut()
-            .expect("terrain_material is not set");
+        let material_3d = self.terrain_material.as_mut().expect("terrain_material is not set");
         material_3d.set_texture(TextureParam::ALBEDO, &image_texture);
 
         log::info!(target: "main", "Textures builded successfily; texture blocks:{} textures loaded:{} (executed:{:.2?})", block_storage.textures_blocks_count(), texture_mapper.len(), now.elapsed());
@@ -121,9 +118,7 @@ impl WorldsManager {
         self.resource_manager = Some(resource_manager);
     }
 
-    pub fn get_block_storage_mut(
-        &self,
-    ) -> RwLockWriteGuard<'_, parking_lot::RawRwLock, BlockStorage> {
+    pub fn get_block_storage_mut(&self) -> RwLockWriteGuard<'_, parking_lot::RawRwLock, BlockStorage> {
         self.block_storage.write()
     }
 
@@ -236,7 +231,11 @@ impl INode for WorldsManager {
         let _span = tracy_client::span!("worlds_manager.physics_process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("worlds_manager.physics_process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("worlds_manager.physics_process"))
+        } else {
+            None
+        };
 
         if self.get_world().is_some() {
             let mut world = self.get_world_mut().unwrap().clone();
@@ -249,7 +248,11 @@ impl INode for WorldsManager {
         let _span = tracy_client::span!("worlds_manager.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("worlds_manager.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("worlds_manager.process"))
+        } else {
+            None
+        };
 
         if self.get_world().is_some() {
             let mut world = self.get_world_mut().unwrap().clone();
@@ -258,8 +261,7 @@ impl INode for WorldsManager {
                 let mut player_controller = player_controller.bind_mut();
 
                 let pos = player_controller.get_position();
-                let chunk_pos = BlockPosition::new(pos.x as i64, pos.y as i64, pos.z as i64)
-                    .get_chunk_position();
+                let chunk_pos = BlockPosition::new(pos.x as i64, pos.y as i64, pos.z as i64).get_chunk_position();
                 let chunk_loaded = match world.bind().get_chunk_map().get_chunk(&chunk_pos) {
                     Some(c) => c.read().is_loaded(),
                     None => false,
@@ -268,9 +270,7 @@ impl INode for WorldsManager {
             }
 
             if let Some(resource_manager) = self.resource_manager.as_ref() {
-                world
-                    .bind_mut()
-                    .custom_process(delta, &*resource_manager.borrow());
+                world.bind_mut().custom_process(delta, &*resource_manager.borrow());
             }
         }
     }

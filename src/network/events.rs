@@ -71,7 +71,11 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
     let _span = tracy_client::span!("network.handle_network_events");
 
     #[cfg(feature = "trace")]
-    let _s = crate::debug::PROFILER.span("network.handle_network_events");
+    let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+        Some(crate::debug::PROFILER.span("network.handle_network_events"))
+    } else {
+        None
+    };
 
     let container = main.get_network().expect("network is not set").clone();
     container.set_network_lock(false);
@@ -87,7 +91,11 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
     for event in network.iter_server_messages() {
         {
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span(span_name_for_event(&event));
+            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                Some(crate::debug::PROFILER.span(span_name_for_event(&event)))
+            } else {
+                None
+            };
 
             handle_event(&*network, main, event)?;
         }

@@ -127,7 +127,11 @@ impl WorldManager {
         let _span = tracy_client::span!("world_manager.physics_process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("world_manager.physics_process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("world_manager.physics_process"))
+        } else {
+            None
+        };
 
         self.physics.step(delta as f32);
     }
@@ -137,11 +141,19 @@ impl WorldManager {
         let _span = tracy_client::span!("world_manager.custom_process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("world_manager.custom_process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("world_manager.custom_process"))
+        } else {
+            None
+        };
 
         {
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span("world_manager.custom_process::send_chunks_to_load");
+            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                Some(crate::debug::PROFILER.span("world_manager.custom_process::send_chunks_to_load"))
+            } else {
+                None
+            };
 
             let map = self.chunk_map.bind();
             map.send_chunks_to_load(
@@ -155,7 +167,11 @@ impl WorldManager {
 
         {
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span("world_manager.custom_process::spawn");
+            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                Some(crate::debug::PROFILER.span("world_manager.custom_process::spawn_loaded_chunks"))
+            } else {
+                None
+            };
 
             let mut map = self.chunk_map.bind_mut();
             map.spawn_loaded_chunks(&self.physics);
@@ -163,7 +179,11 @@ impl WorldManager {
 
         {
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span("world_manager.custom_process::update_geometry");
+            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                Some(crate::debug::PROFILER.span("world_manager.custom_process::update_geometry"))
+            } else {
+                None
+            };
 
             let bs = self.block_storage.read();
             let tm = self.texture_mapper.read();

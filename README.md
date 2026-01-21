@@ -3,9 +3,13 @@
 In-Its-Brilliance/.cargo/config.toml
 
 ``` toml
-[patch.crates-io]
+[patch."https://github.com/In-Its-Brilliance/brilliance-common"]
 common = { path = "brilliance-common" }
+
+[patch."https://github.com/In-Its-Brilliance/brilliance-network"]
 network = { path = "brilliance-network" }
+
+[patch."https://github.com/In-Its-Brilliance/brilliance-physics"]
 physics = { path = "brilliance-physics" }
 ```
 

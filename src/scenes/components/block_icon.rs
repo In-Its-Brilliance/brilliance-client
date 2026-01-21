@@ -198,7 +198,11 @@ impl IControl for BlockIcon {
         let _span = tracy_client::span!("block_icon.process");
 
         #[cfg(feature = "trace")]
-        let _span = crate::debug::PROFILER.span("block_icon.process");
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("block_icon.process"))
+        } else {
+            None
+        };
 
         if self.item_description.is_some() {
             let mouse_position = self.base().get_viewport().unwrap().get_mouse_position();
