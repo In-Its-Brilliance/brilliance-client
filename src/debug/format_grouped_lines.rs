@@ -1,9 +1,12 @@
-use std::{borrow::Cow, time::Duration};
+use std::time::Duration;
 
-pub(crate) fn format_grouped_lines(items: Vec<(&Cow<'static, str>, Duration, Duration)>, limit: usize) -> String {
+pub(crate) fn format_grouped_lines(
+    items: Vec<(&'static str, Duration, Duration)>,
+    limit: usize,
+) -> String {
     use std::collections::HashMap;
 
-    let mut grouped: HashMap<&str, Vec<(&Cow<'static, str>, Duration, Duration)>> = HashMap::new();
+    let mut grouped: HashMap<&str, Vec<(&'static str, Duration, Duration)>> = HashMap::new();
 
     for (name, last, avg) in items {
         let root = name.split("::").next().unwrap();
@@ -15,7 +18,7 @@ pub(crate) fn format_grouped_lines(items: Vec<(&Cow<'static, str>, Duration, Dur
         .map(|(root, v)| {
             let parent_last = v
                 .iter()
-                .find(|(name, _, _)| name.as_ref() == *root)
+                .find(|(name, _, _)| *name == *root)
                 .map(|(_, last, _)| *last)
                 .unwrap_or(Duration::ZERO);
 
@@ -33,7 +36,7 @@ pub(crate) fn format_grouped_lines(items: Vec<(&Cow<'static, str>, Duration, Dur
 
         let parent_avg = parts
             .iter()
-            .find(|(name, _, _)| name.as_ref() == root)
+            .find(|(name, _, _)| *name == root)
             .map(|(_, _, avg)| *avg)
             .unwrap_or(Duration::ZERO);
 
@@ -43,7 +46,7 @@ pub(crate) fn format_grouped_lines(items: Vec<(&Cow<'static, str>, Duration, Dur
         ));
 
         for (name, last, avg) in parts {
-            if name.as_ref() != root {
+            if *name != root {
                 let percent = if parent_last.as_nanos() > 0 {
                     last.as_secs_f64() / parent_last.as_secs_f64() * 100.0
                 } else {

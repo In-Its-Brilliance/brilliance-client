@@ -85,7 +85,7 @@ impl RuntimeReporter {
             .map(|(name, (total, count))| {
                 let avg = *total / *count;
                 let last = *last.get(name).unwrap_or(&Duration::ZERO);
-                (name, last, avg)
+                (*name, last, avg)
             })
             .collect();
 
