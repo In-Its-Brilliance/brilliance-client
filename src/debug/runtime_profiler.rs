@@ -1,9 +1,7 @@
+use lazy_static::lazy_static;
 use std::time::Instant;
 
-use lazy_static::lazy_static;
-
 pub struct RuntimeSpan {
-    profiler: &'static RuntimeProfiler,
     name: &'static str,
     start: Instant,
 }
@@ -17,7 +15,6 @@ pub struct RuntimeProfiler;
 impl RuntimeProfiler {
     pub fn span(&'static self, name: &'static str) -> RuntimeSpan {
         RuntimeSpan {
-            profiler: self,
             name,
             start: Instant::now(),
         }
@@ -30,6 +27,6 @@ impl Drop for RuntimeSpan {
         crate::debug::runtime_storage::RUNTIME_STORAGE
             .lock()
             .unwrap()
-            .push(self.name.clone(), elapsed);
+            .push(self.name, elapsed);
     }
 }
