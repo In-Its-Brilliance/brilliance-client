@@ -42,6 +42,30 @@ fn get_world_mut(worlds_manager: &mut WorldsManager, world_slug: String) -> Opti
     Some(world)
 }
 
+#[cfg(feature = "trace")]
+fn span_name_for_event(event: &ServerMessages) -> &'static str {
+    match event {
+        ServerMessages::AllowConnection => "network.handle_network_events::AllowConnection",
+        ServerMessages::Disconnect { .. } => "network.handle_network_events::Disconnect",
+        ServerMessages::ConsoleOutput { .. } => "network.handle_network_events::ConsoleOutput",
+        ServerMessages::ResourcesScheme { .. } => "network.handle_network_events::ResourcesScheme",
+        ServerMessages::ResourcesPart { .. } => "network.handle_network_events::ResourcesPart",
+        ServerMessages::Settings { .. } => "network.handle_network_events::Settings",
+        ServerMessages::SpawnWorld { .. } => "network.handle_network_events::SpawnWorld",
+        ServerMessages::UpdatePlayerComponent { .. } => "network.handle_network_events::UpdatePlayerComponent",
+        ServerMessages::PlayerSpawn { .. } => "network.handle_network_events::PlayerSpawn",
+        ServerMessages::ChunkSectionInfoEncoded { .. } => "network.handle_network_events::ChunkSectionInfoEncoded",
+        ServerMessages::ChunkSectionInfo { .. } => "network.handle_network_events::ChunkSectionInfo",
+        ServerMessages::UnloadChunks { .. } => "network.handle_network_events::UnloadChunks",
+        ServerMessages::StartStreamingEntity { .. } => "network.handle_network_events::StartStreamingEntity",
+        ServerMessages::UpdateEntityComponent { .. } => "network.handle_network_events::UpdateEntityComponent",
+        ServerMessages::EntityMove { .. } => "network.handle_network_events::EntityMove",
+        ServerMessages::StopStreamingEntities { .. } => "network.handle_network_events::StopStreamingEntities",
+        ServerMessages::EditBlock { .. } => "network.handle_network_events::EditBlock",
+        _ => "network.handle_network_events::Other",
+    }
+}
+
 pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String> {
     #[cfg(feature = "trace")]
     let _span = tracy_client::span!("network.handle_network_events");
@@ -62,11 +86,8 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
     // Recieve decoded server messages from network thread
     for event in network.iter_server_messages() {
         {
-            let name: &str = event.as_ref();
-            let span_name = format!("network.handle_network_events::{}", name);
-
             #[cfg(feature = "trace")]
-            let _s = crate::debug::PROFILER.span(span_name);
+            let _s = crate::debug::PROFILER.span(span_name_for_event(&event));
 
             handle_event(&*network, main, event)?;
         }

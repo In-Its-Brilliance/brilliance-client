@@ -35,6 +35,8 @@ pub const DEFAULT_THEME_PATH: &str = "res://assets/gui/default_theme.tres";
 
 pub type ResourceManagerType = Rc<RefCell<ResourceManager>>;
 
+const TRACE_FLUSH_EVERY_N_FRAMES: u32 = 10;
+
 #[derive(GodotClass)]
 #[class(init, tool, base=Node)]
 pub struct MainScene {
@@ -80,6 +82,9 @@ pub struct MainScene {
 
     #[export]
     worlde_environment: Option<Gd<WorldEnvironment>>,
+
+    #[init(val = 0)]
+    trace_flush_counter: u32,
 }
 
 impl MainScene {
@@ -505,7 +510,14 @@ impl INode for MainScene {
         }
 
         #[cfg(feature = "trace")]
-        crate::debug::runtime_storage::RUNTIME_STORAGE.lock().unwrap().flush();
+        {
+            self.trace_flush_counter = self.trace_flush_counter.wrapping_add(1);
+            if self.trace_flush_counter % TRACE_FLUSH_EVERY_N_FRAMES == 0 {
+                if let Ok(mut storage) = crate::debug::STORAGE.try_lock() {
+                    storage.flush();
+                }
+            }
+        }
     }
 
     fn exit_tree(&mut self) {

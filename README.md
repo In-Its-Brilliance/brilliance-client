@@ -1,8 +1,12 @@
 # Godot client rust code
 
-## Release build
-``` shell
-cargo build --release --no-default-features --features use-git,trace
+In-Its-Brilliance/.cargo/config.toml
+
+``` toml
+[patch.crates-io]
+common = { path = "brilliance-common" }
+network = { path = "brilliance-network" }
+physics = { path = "brilliance-physics" }
 ```
 
 ## Run tests
