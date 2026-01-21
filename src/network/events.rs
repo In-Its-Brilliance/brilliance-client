@@ -88,16 +88,14 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
 
     // Recieve decoded server messages from network thread
     for event in network.iter_server_messages() {
-        {
-            #[cfg(feature = "trace")]
-            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                Some(crate::debug::PROFILER.span(span_name_for_event(&event)))
-            } else {
-                None
-            };
+        #[cfg(feature = "trace")]
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span(span_name_for_event(&event)))
+        } else {
+            None
+        };
 
-            handle_event(&*network, main, event)?;
-        }
+        handle_event(&*network, main, event)?;
     }
 
     let network_info = network.get_network_info().clone();

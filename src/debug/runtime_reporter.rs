@@ -8,7 +8,6 @@ use crate::debug::format_grouped_lines::format_grouped_lines;
 
 use super::runtime_storage::{LastType, SpansType};
 
-const REPORT_LIMIT: usize = 10;
 const REPORT_COOLDOWN: Duration = Duration::from_secs(10);
 
 macro_rules! lags_template {
@@ -97,7 +96,7 @@ impl RuntimeReporter {
             lags_template!(),
             godot = godot_stats(),
             process = process * 1000.0,
-            lines = format_grouped_lines(items, REPORT_LIMIT),
+            lines = format_grouped_lines(items),
             fps = fps,
         );
 

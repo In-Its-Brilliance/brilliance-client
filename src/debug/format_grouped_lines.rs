@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-pub(crate) fn format_grouped_lines(
-    items: Vec<(&'static str, Duration, Duration)>,
-    limit: usize,
-) -> String {
+const PARENTS_LIMIT: usize = 10;
+const CHILDREN_LIMIT: usize = 5;
+
+pub(crate) fn format_grouped_lines(items: Vec<(&'static str, Duration, Duration)>) -> String {
     use std::collections::HashMap;
 
     let mut grouped: HashMap<&str, Vec<(&'static str, Duration, Duration)>> = HashMap::new();
@@ -28,10 +28,9 @@ pub(crate) fn format_grouped_lines(
 
     roots.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let limit = roots.len().min(limit);
     let mut lines = String::new();
 
-    for (i, (root, parent_last)) in roots.into_iter().take(limit).enumerate() {
+    for (i, (root, parent_last)) in roots.into_iter().take(PARENTS_LIMIT).enumerate() {
         let parts = &grouped[root];
 
         let parent_avg = parts
@@ -45,26 +44,31 @@ pub(crate) fn format_grouped_lines(
             root, parent_last, parent_avg
         ));
 
-        for (name, last, avg) in parts {
-            if *name != root {
-                let percent = if parent_last.as_nanos() > 0 {
-                    last.as_secs_f64() / parent_last.as_secs_f64() * 100.0
-                } else {
-                    0.0
-                };
+        let mut children: Vec<_> = parts
+            .iter()
+            .filter(|(name, _, _)| *name != root)
+            .collect();
 
-                lines.push('\n');
-                lines.push_str(&format!(
-                    "      > &e{}&r &8{:.1?} {:.0}% &7(avg {:.1?})",
-                    name.split("::").last().unwrap(),
-                    last,
-                    percent,
-                    avg
-                ));
-            }
+        children.sort_by(|a, b| b.1.cmp(&a.1));
+
+        for (name, last, avg) in children.into_iter().take(CHILDREN_LIMIT) {
+            let percent = if parent_last.as_nanos() > 0 {
+                last.as_secs_f64() / parent_last.as_secs_f64() * 100.0
+            } else {
+                0.0
+            };
+
+            lines.push('\n');
+            lines.push_str(&format!(
+                "      > &e{}&r &8{:.1?} {:.0}% &7(avg {:.1?})",
+                name.split("::").last().unwrap(),
+                last,
+                percent,
+                avg
+            ));
         }
 
-        if i + 1 < limit {
+        if i + 1 < PARENTS_LIMIT {
             lines.push('\n');
         }
     }

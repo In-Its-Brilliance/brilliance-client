@@ -83,6 +83,7 @@ pub struct MainScene {
     #[export]
     worlde_environment: Option<Gd<WorldEnvironment>>,
 
+    #[cfg(feature = "trace")]
     #[init(val = 0)]
     trace_flush_counter: u32,
 }
