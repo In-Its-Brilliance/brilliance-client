@@ -69,9 +69,10 @@ pub(crate) fn format_grouped_lines(items: Vec<(&'static str, Duration, Duration)
             };
 
             lines.push('\n');
+            let sub_name = name.split("::").last().filter(|s| !s.is_empty()).unwrap_or(name);
             lines.push_str(&format!(
                 "    > &e{name:<NAME_WIDTH_CHILD$}&r > &8{last:>TIME_WIDTH$.1}ms&r {percent:>2.0}%&r &7(avg {avg:.1}ms)&r",
-                name=cut(name.split("::").last().unwrap(), NAME_WIDTH_CHILD),
+                name=cut(sub_name, NAME_WIDTH_CHILD),
                 last=fmt_ms(*last),
                 percent=percent,
                 avg=fmt_ms(*avg),
