@@ -62,7 +62,6 @@ fn span_name_for_event(event: &ServerMessages) -> &'static str {
         ServerMessages::EntityMove { .. } => "network.handle_network_events::EntityMove",
         ServerMessages::StopStreamingEntities { .. } => "network.handle_network_events::StopStreamingEntities",
         ServerMessages::EditBlock { .. } => "network.handle_network_events::EditBlock",
-        _ => "network.handle_network_events::Other",
     }
 }
 

@@ -1,7 +1,6 @@
 use godot::classes::performance::Monitor;
 use godot::classes::{Engine, Performance};
 use godot::obj::Singleton;
-use std::borrow::Cow;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -27,7 +26,6 @@ pub struct RuntimeReporter;
 static LAST_REPORT: Mutex<Option<Instant>> = Mutex::new(None);
 
 fn godot_stats() -> String {
-    
     let p = Performance::singleton();
 
     let process = p.get_monitor(Monitor::TIME_PROCESS);
@@ -63,6 +61,15 @@ fn godot_stats() -> String {
 
 impl RuntimeReporter {
     pub fn report(spans: &SpansType, last: &LastType) -> bool {
+        if spans.is_empty() {
+            return false;
+        }
+
+        let fps = Engine::singleton().get_frames_per_second();
+        if fps >= 60.0 {
+            return false;
+        }
+
         {
             let mut last_report = LAST_REPORT.lock().unwrap();
             if let Some(t) = *last_report {
@@ -73,19 +80,14 @@ impl RuntimeReporter {
             *last_report = Some(Instant::now());
         }
 
-        let mut items: Vec<(&Cow<'static, str>, Duration, Duration)> = spans
+        let mut items: Vec<(&'static str, Duration, Duration)> = spans
             .iter()
             .map(|(name, (total, count))| {
                 let avg = *total / *count;
                 let last = *last.get(name).unwrap_or(&Duration::ZERO);
-                (name, last, avg)
+                (*name, last, avg)
             })
             .collect();
-
-        let fps = Engine::singleton().get_frames_per_second();
-        if fps >= 60.0 {
-            return false;
-        }
 
         items.sort_by(|a, b| b.1.cmp(&a.1));
 
