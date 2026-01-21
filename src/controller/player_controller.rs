@@ -630,6 +630,14 @@ impl INode3D for PlayerController {
             self.set_selected_item(self.selected_item.clone());
         }
 
-        self.update_cache_movement();
+        {
+            #[cfg(feature = "trace")]
+            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                Some(crate::debug::PROFILER.span("player_controller.process::update_cache_movement"))
+            } else {
+                None
+            };
+            self.update_cache_movement();
+        }
     }
 }

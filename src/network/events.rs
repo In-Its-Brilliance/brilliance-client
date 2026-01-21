@@ -79,7 +79,15 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
     let container = main.get_network().expect("network is not set").clone();
     container.set_network_lock(false);
 
-    let network = container.get_client();
+    let network = {
+        #[cfg(feature = "trace")]
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("network.handle_network_events::get_client"))
+        } else {
+            None
+        };
+        container.get_client()
+    };
 
     // Recieve errors from network thread
     for error in network.iter_errors() {
