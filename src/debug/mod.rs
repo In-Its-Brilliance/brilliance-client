@@ -1,6 +1,9 @@
 pub mod debug_info;
 
 #[cfg(feature = "trace")]
+use lazy_static::lazy_static;
+
+#[cfg(feature = "trace")]
 pub mod runtime_profiler;
 
 #[cfg(feature = "trace")]
@@ -13,7 +16,9 @@ pub mod runtime_reporter;
 pub mod format_grouped_lines;
 
 #[cfg(feature = "trace")]
-pub use runtime_profiler::RUNTIME_PROFILER as PROFILER;
+lazy_static! {
+    pub static ref STORAGE: std::sync::Mutex<runtime_storage::RuntimeStorage> =
+        std::sync::Mutex::new(runtime_storage::RuntimeStorage::new());
 
-#[cfg(feature = "trace")]
-pub use runtime_storage::RUNTIME_STORAGE as STORAGE;
+    pub static ref PROFILER: runtime_profiler::RuntimeProfiler = runtime_profiler::RuntimeProfiler;
+}

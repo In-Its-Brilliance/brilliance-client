@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::time::Duration;
-
-use lazy_static::lazy_static;
 
 use super::runtime_reporter::RuntimeReporter;
 
@@ -42,8 +39,4 @@ impl RuntimeStorage {
             self.last.clear();
         }
     }
-}
-
-lazy_static! {
-    pub static ref RUNTIME_STORAGE: Mutex<RuntimeStorage> = Mutex::new(RuntimeStorage::new());
 }

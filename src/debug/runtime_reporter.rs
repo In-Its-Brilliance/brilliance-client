@@ -39,14 +39,9 @@ fn godot_stats() -> String {
     let vram = p.get_monitor(Monitor::RENDER_VIDEO_MEM_USED) / 1024.0 / 1024.0;
 
     format!(
-        "  &acpu process &7{:.1}ms
-  &aphysics &7{:.1}ms
-  &anavigation &7{:.1}ms
-  &arender draws &7{:.0}
-  &aobjects &7{:.0}
-  &aprimitives &7{:.0}
-  &amemory ram &7{:.1}MB
-  &avram &7{:.1}MB",
+        "  &acpu process &7{:.1}ms &r| &aphysics &7{:.1}ms
+  &anavigation &7{:.1}ms &r| &arender draws &7{:.0} &r| &aobjects &7{:.0}
+  &aprimitives &7{:.0} &r| &amemory ram &7{:.1}MB &r| &avram &7{:.1}MB",
         process * 1000.0,
         physics * 1000.0,
         navigation * 1000.0,
