@@ -1,4 +1,3 @@
-use common::chunks::block_position::{BlockPosition, BlockPositionTrait};
 use godot::classes::base_material_3d::TextureParam;
 use godot::classes::StandardMaterial3D;
 use godot::prelude::*;
@@ -7,14 +6,15 @@ use parking_lot::lock_api::{RwLockReadGuard, RwLockWriteGuard};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-use crate::client_scripts::resource_manager::{ResourceManager, ResourceStorage};
+use super::block_storage::BlockStorage;
+use super::world_manager::{WorldManager, NEAR_DISTANCE};
+use crate::client_scripts::resource_manager::ResourceStorage;
+use crate::controller::entity_movement::EntityMovement;
 use crate::controller::player_controller::PlayerController;
 use crate::scenes::components::block_mesh_storage::BlockMeshStorage;
 use crate::scenes::main_scene::ResourceManagerType;
+use crate::utils::bridge::IntoChunkPositionVector;
 use crate::utils::textures::texture_mapper::TextureMapper;
-
-use super::block_storage::BlockStorage;
-use super::world_manager::WorldManager;
 
 pub type TextureMapperType = Arc<RwLock<TextureMapper>>;
 pub type BlockStorageType = Arc<RwLock<BlockStorage>>;
@@ -52,7 +52,7 @@ pub struct WorldsManager {
     world: Option<Gd<WorldManager>>,
     player_controller: Option<Gd<PlayerController>>,
 
-    resource_manager: Option<ResourceManagerType>,
+    pub(crate) resource_manager: Option<ResourceManagerType>,
 
     #[init(val = Arc::new(RwLock::new(Default::default())))]
     texture_mapper: TextureMapperType,
@@ -90,12 +90,16 @@ impl WorldsManager {
         return Ok(());
     }
 
-    pub fn on_network_connected(&mut self, resource_manager: &ResourceManager) {
+    pub fn get_resource_manager(&self) -> std::cell::Ref<'_, crate::client_scripts::resource_manager::ResourceManager> {
+        self.resource_manager.as_ref().unwrap().borrow()
+    }
+
+    pub fn on_network_connected(&mut self) {
         let block_mesh_storage = {
             BlockMeshStorage::init(
                 &*self.get_block_storage(),
                 &self.get_materials(),
-                &*resource_manager,
+                &self.get_resource_manager(),
                 &*self.get_texture_mapper(),
             )
         };
@@ -112,10 +116,6 @@ impl WorldsManager {
 
     pub fn get_block_storage(&self) -> RwLockReadGuard<'_, parking_lot::RawRwLock, BlockStorage> {
         self.block_storage.read()
-    }
-
-    pub fn set_resource_manager(&mut self, resource_manager: ResourceManagerType) {
-        self.resource_manager = Some(resource_manager);
     }
 
     pub fn get_block_storage_mut(&self) -> RwLockWriteGuard<'_, parking_lot::RawRwLock, BlockStorage> {
@@ -186,6 +186,7 @@ impl WorldsManager {
                 self.texture_mapper.clone(),
                 self.get_materials(),
                 self.block_storage.clone(),
+                self.resource_manager.as_ref().unwrap().clone(),
             )
         });
 
@@ -223,55 +224,44 @@ impl WorldsManager {
 }
 
 #[godot_api]
-impl INode for WorldsManager {
-    fn ready(&mut self) {}
-
-    fn physics_process(&mut self, delta: f64) {
+impl WorldsManager {
+    #[func]
+    pub fn handler_player_move(&mut self, movement: Gd<EntityMovement>, new_chunk: bool) {
         #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("worlds_manager.physics_process");
+        let _span = tracy_client::span!("worlds_manager.handler_player_move");
 
         #[cfg(feature = "trace")]
         let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("worlds_manager.physics_process"))
+            Some(crate::debug::PROFILER.span("worlds_manager.handler_player_move"))
         } else {
             None
         };
 
-        if self.get_world().is_some() {
-            let mut world = self.get_world_mut().unwrap().clone();
-            world.bind_mut().physics_process(delta);
+        let world = self.world.as_ref().unwrap().bind();
+
+        let chunk_map = world.get_chunk_map();
+
+        if let Some(player_controller) = self.player_controller.as_mut() {
+            let chunk_pos = player_controller.get_position().to_chunk_position();
+
+            let chunk_loaded = match chunk_map.get_chunk(&chunk_pos) {
+                Some(c) => c.read().is_loaded(),
+                None => false,
+            };
+            player_controller.bind_mut().set_frozen(!chunk_loaded);
         }
-    }
 
-    fn process(&mut self, delta: f64) {
-        #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("worlds_manager.process");
+        if new_chunk {
+            let new_chunk = movement.bind().get_position().to_chunk_position();
+            for (_chunk_position, chunk_column_lock) in chunk_map.iter() {
+                let chunk_column = chunk_column_lock.read();
+                let is_near = chunk_column.get_position().to_chunk_position().get_distance(&new_chunk) < NEAR_DISTANCE;
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("worlds_manager.process"))
-        } else {
-            None
-        };
-
-        if self.get_world().is_some() {
-            let mut world = self.get_world_mut().unwrap().clone();
-
-            if let Some(player_controller) = self.player_controller.as_mut() {
-                let mut player_controller = player_controller.bind_mut();
-
-                let pos = player_controller.get_position();
-                let chunk_pos = BlockPosition::new(pos.x as i64, pos.y as i64, pos.z as i64).get_chunk_position();
-                let chunk_loaded = match world.bind().get_chunk_map().get_chunk(&chunk_pos) {
-                    Some(c) => c.read().is_loaded(),
-                    None => false,
-                };
-                player_controller.custom_process(delta, chunk_loaded, world.bind().get_slug());
-            }
-
-            if let Some(resource_manager) = self.resource_manager.as_ref() {
-                world.bind_mut().custom_process(delta, &*resource_manager.borrow());
+                chunk_column.update_collider_group(is_near);
             }
         }
     }
 }
+
+#[godot_api]
+impl INode for WorldsManager {}

@@ -99,6 +99,15 @@ impl MainScene {
         scene.bind_mut().ip_port = Some(ip_port);
         scene.bind_mut().login = Some(login);
         scene.bind_mut().game_settings = Some(game_settings);
+
+        let resource_manager = scene.bind().resource_manager.clone();
+
+        {
+            let mut main_scene = scene.bind_mut();
+            let wm = main_scene.worlds_manager.as_mut().expect("worlds_manager is not set");
+            wm.bind_mut().resource_manager = Some(resource_manager);
+        }
+
         scene
     }
 
@@ -156,9 +165,7 @@ impl MainScene {
     /// Signaling that everything is loaded from the server
     pub fn on_server_connected(&mut self) {
         self.debug_info.bind_mut().toggle(true);
-
-        let rm = self.resource_manager.clone();
-        self.get_worlds_manager_mut().on_network_connected(&*rm.borrow());
+        self.get_worlds_manager_mut().on_network_connected();
     }
 
     /// Player can teleport in new world, between worlds or in exsting world
@@ -190,14 +197,14 @@ impl MainScene {
         player_controller
             .signals()
             .player_move()
-            .connect_other(&world.bind().to_gd(), WorldManager::handler_player_move);
+            .connect_other(&worlds_manager.to_gd(), WorldsManager::handler_player_move);
 
         player_controller
             .signals()
             .player_action()
             .connect_other(&self.to_gd(), MainScene::handler_player_action);
 
-        player_controller.bind_mut().set_blocks(&*worlds_manager);
+        player_controller.bind_mut().set_block_storage(&*worlds_manager);
     }
 }
 
@@ -361,6 +368,14 @@ impl MainScene {
         let a = action.bind();
         let network = self.get_network().unwrap();
         if let Some(look_at) = a.get_hit() {
+            let world_slug = {
+                let worlds_manager = self.worlds_manager.as_ref().unwrap();
+                let wm = worlds_manager.bind();
+                let world = wm.get_world().unwrap();
+                let world = world.bind();
+                world.get_slug().clone()
+            };
+
             match look_at.bind().get_physics_type() {
                 PhysicsType::ChunkMeshCollider(_chunk_position) => {
                     let selected_block = look_at.bind().get_cast_result().get_selected_block();
@@ -369,7 +384,7 @@ impl MainScene {
                             match i {
                                 SelectedItem::BlockPlacing(block_info) => {
                                     let msg = ClientMessages::EditBlockRequest {
-                                        world_slug: a.get_world_slug().clone(),
+                                        world_slug: world_slug.clone(),
                                         position: look_at.bind().get_cast_result().get_place_block(),
                                         new_block_info: Some(block_info.clone()),
                                     };
@@ -379,7 +394,7 @@ impl MainScene {
                         }
                     } else {
                         let msg = ClientMessages::EditBlockRequest {
-                            world_slug: a.get_world_slug().clone(),
+                            world_slug: world_slug.clone(),
                             position: selected_block,
                             new_block_info: None,
                         };
@@ -459,13 +474,6 @@ impl INode for MainScene {
             } else {
                 DisplayServer::singleton().window_set_vsync_mode(VSyncMode::DISABLED);
             }
-        }
-
-        let mut wm = self.worlds_manager.clone();
-        if let Some(worlds_manager) = wm.as_mut() {
-            worlds_manager
-                .bind_mut()
-                .set_resource_manager(self.resource_manager.clone());
         }
     }
 

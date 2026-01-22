@@ -77,6 +77,8 @@ pub struct PlayerController {
     window_focus: bool,
 
     camera_mode: CameraMode,
+
+    frozen: bool,
 }
 
 impl PlayerController {
@@ -124,7 +126,13 @@ impl PlayerController {
 
             window_focus: true,
             camera_mode: CameraMode::FirstPerson,
+
+            frozen: false,
         }
+    }
+
+    pub fn set_frozen(&mut self, state: bool) {
+        self.frozen = state
     }
 
     pub fn set_selected_item(&mut self, new_item: Option<SelectedItem>) {
@@ -346,97 +354,6 @@ impl PlayerController {
         &self.look_at_message
     }
 
-    pub fn custom_process(&mut self, delta: f64, chunk_loaded: bool, world_slug: &String) {
-        #[cfg(feature = "trace")]
-        let _span = tracy_client::span!("player_controller.custom_process");
-
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("player_controller.custom_process"))
-        } else {
-            None
-        };
-
-        // Set lock if chunk is in loading
-        self.collider.set_enabled(chunk_loaded);
-
-        if chunk_loaded {
-            {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.custom_process::detect_is_grounded"))
-                } else {
-                    None
-                };
-
-                self.detect_is_grounded(delta);
-            }
-
-            let movement = self.get_movement(delta);
-
-            let mut filter = QueryFilter::default();
-            filter.exclude_sensors();
-            filter.exclude_collider(&self.collider);
-            filter.collision_mask(PLAYER_GROUP, WORLD_NEAR_GROUP);
-
-            let translation = {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.custom_process::move_shape"))
-                } else {
-                    None
-                };
-
-                self.character_controller
-                    .move_shape(&self.collider, filter, delta, movement.to_network())
-            };
-
-            self.collider.set_position(self.collider.get_position() + translation);
-
-            let hit = {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.custom_process::update_vision"))
-                } else {
-                    None
-                };
-
-                self.update_vision()
-            };
-            self.signals().look_at_update().emit(hit.as_ref());
-
-            let action_type = if self.controls.bind().is_main_action() {
-                Some(PlayerActionType::Main)
-            } else if self.controls.bind().is_second_action() {
-                Some(PlayerActionType::Second)
-            } else {
-                None
-            };
-
-            if let Some(action_type) = action_type {
-                let action = Gd::<PlayerAction>::from_init_fn(|_base| {
-                    PlayerAction::create(hit, action_type, world_slug.clone())
-                });
-                let captured = Input::singleton().get_mouse_mode() == MouseMode::CAPTURED;
-                if captured && self.ui_lock <= 0.0 && self.window_focus {
-                    let selected_item = Gd::<SelectedItemGd>::from_init_fn(|_base| {
-                        SelectedItemGd::create(self.get_selected_item().clone())
-                    });
-                    self.signals().player_action().emit(&action, &selected_item);
-                }
-            }
-        }
-
-        // Sync godot object position
-        let physics_pos = self.collider.get_position();
-        // Controller position is lowered by half of the center of mass position
-        self.base_mut().set_position(Vector3::new(
-            physics_pos.x,
-            physics_pos.y - CONTROLLER_HEIGHT / 2.0,
-            physics_pos.z,
-        ));
-    }
-
     fn update_cache_movement(&mut self) {
         // Handle player movement
         let new_movement = Gd::<EntityMovement>::from_init_fn(|_base| {
@@ -466,7 +383,7 @@ impl PlayerController {
         }
     }
 
-    pub fn set_blocks(&mut self, worlds_manager: &WorldsManager) {
+    pub fn set_block_storage(&mut self, worlds_manager: &WorldsManager) {
         let block_storage_lock = worlds_manager.get_block_storage_lock();
 
         let block_mesh_storage = worlds_manager.get_block_mesh_storage().unwrap();
@@ -629,6 +546,84 @@ impl INode3D for PlayerController {
         if selected_item_updated {
             self.set_selected_item(self.selected_item.clone());
         }
+
+        if !self.frozen {
+            {
+                #[cfg(feature = "trace")]
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.process::detect_is_grounded"))
+                } else {
+                    None
+                };
+
+                self.detect_is_grounded(delta);
+            }
+
+            let movement = self.get_movement(delta);
+
+            let mut filter = QueryFilter::default();
+            filter.exclude_sensors();
+            filter.exclude_collider(&self.collider);
+            filter.collision_mask(PLAYER_GROUP, WORLD_NEAR_GROUP);
+
+            // When there is no movement input, skip move_shape to avoid unnecessary physics work
+            // and potential side effects inside the physics controller
+            let translation = if movement == Vector3::ZERO {
+                Vector3::ZERO.to_network()
+            } else {
+                #[cfg(feature = "trace")]
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.process::move_shape"))
+                } else {
+                    None
+                };
+
+                self.character_controller
+                    .move_shape(&self.collider, filter, delta, movement.to_network())
+            };
+
+            self.collider.set_position(self.collider.get_position() + translation);
+
+            let hit = {
+                #[cfg(feature = "trace")]
+                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+                    Some(crate::debug::PROFILER.span("player_controller.process::update_vision"))
+                } else {
+                    None
+                };
+
+                self.update_vision()
+            };
+            self.signals().look_at_update().emit(hit.as_ref());
+
+            let action_type = if self.controls.bind().is_main_action() {
+                Some(PlayerActionType::Main)
+            } else if self.controls.bind().is_second_action() {
+                Some(PlayerActionType::Second)
+            } else {
+                None
+            };
+
+            if let Some(action_type) = action_type {
+                let action = Gd::<PlayerAction>::from_init_fn(|_base| PlayerAction::create(hit, action_type));
+                let captured = Input::singleton().get_mouse_mode() == MouseMode::CAPTURED;
+                if captured && self.ui_lock <= 0.0 && self.window_focus {
+                    let selected_item = Gd::<SelectedItemGd>::from_init_fn(|_base| {
+                        SelectedItemGd::create(self.get_selected_item().clone())
+                    });
+                    self.signals().player_action().emit(&action, &selected_item);
+                }
+            }
+        }
+
+        // Sync godot object position
+        let physics_pos = self.collider.get_position();
+        // Controller position is lowered by half of the center of mass position
+        self.base_mut().set_position(Vector3::new(
+            physics_pos.x,
+            physics_pos.y - CONTROLLER_HEIGHT / 2.0,
+            physics_pos.z,
+        ));
 
         {
             #[cfg(feature = "trace")]

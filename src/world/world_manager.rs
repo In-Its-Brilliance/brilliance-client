@@ -5,10 +5,8 @@ use super::{
     worlds_manager::{BlockStorageType, TextureMapperType, WorldMaterials},
 };
 use crate::{
-    client_scripts::resource_manager::{ResourceManager, ResourceStorage},
-    controller::entity_movement::EntityMovement,
-    entities::entities_manager::EntitiesManager,
-    utils::bridge::IntoChunkPositionVector,
+    client_scripts::resource_manager::ResourceStorage, entities::entities_manager::EntitiesManager,
+    scenes::main_scene::ResourceManagerType,
 };
 use common::chunks::{
     block_position::BlockPosition,
@@ -44,6 +42,8 @@ pub struct WorldManager {
     texture_mapper: TextureMapperType,
     materials: WorldMaterials,
     block_storage: BlockStorageType,
+
+    resource_manager: ResourceManagerType,
 }
 
 impl WorldManager {
@@ -53,6 +53,7 @@ impl WorldManager {
         texture_mapper: TextureMapperType,
         materials: WorldMaterials,
         block_storage: BlockStorageType,
+        resource_manager: ResourceManagerType,
     ) -> Self {
         let physics = PhysicsProxy::default();
         let mut chunk_map = Gd::<ChunkMap>::from_init_fn(|base| ChunkMap::create(base));
@@ -70,6 +71,8 @@ impl WorldManager {
             texture_mapper,
             materials,
             block_storage,
+
+            resource_manager,
         }
     }
 
@@ -116,8 +119,22 @@ impl WorldManager {
             .bind()
             .edit_block(position, block_storage, new_block_info, &self.physics, resource_storage)
     }
+}
 
-    pub fn physics_process(&mut self, delta: f64) {
+#[godot_api]
+impl WorldManager {}
+
+#[godot_api]
+impl INode for WorldManager {
+    fn ready(&mut self) {
+        let chunk_map = self.chunk_map.clone();
+        self.base_mut().add_child(&chunk_map);
+
+        let entities_manager = self.entities_manager.clone();
+        self.base_mut().add_child(&entities_manager);
+    }
+
+    fn physics_process(&mut self, delta: f64) {
         // Skip physics in tools mode
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
@@ -136,7 +153,7 @@ impl WorldManager {
         self.physics.step(delta as f32);
     }
 
-    pub fn custom_process(&mut self, _delta: f64, resource_manager: &ResourceManager) {
+    fn process(&mut self, _delta: f64) {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("world_manager.custom_process");
 
@@ -161,7 +178,7 @@ impl WorldManager {
                 self.texture_mapper.clone(),
                 self.block_storage.clone(),
                 &self.physics,
-                resource_manager,
+                &*self.resource_manager.borrow(),
             );
         }
 
@@ -190,34 +207,5 @@ impl WorldManager {
             let map = self.chunk_map.bind();
             map.update_chunks_geometry(&self.physics, &bs, &tm);
         }
-    }
-}
-
-#[godot_api]
-impl WorldManager {
-    #[func]
-    pub fn handler_player_move(&mut self, movement: Gd<EntityMovement>, new_chunk: bool) {
-        if !new_chunk {
-            return;
-        }
-        let new_chunk = movement.bind().get_position().to_chunk_position();
-        let chunk_map = self.chunk_map.bind();
-        for (_chunk_position, chunk_column_lock) in chunk_map.iter() {
-            let chunk_column = chunk_column_lock.read();
-            let is_near = chunk_column.get_position().to_chunk_position().get_distance(&new_chunk) < NEAR_DISTANCE;
-
-            chunk_column.update_collider_group(is_near);
-        }
-    }
-}
-
-#[godot_api]
-impl INode for WorldManager {
-    fn ready(&mut self) {
-        let chunk_map = self.chunk_map.clone();
-        self.base_mut().add_child(&chunk_map);
-
-        let entities_manager = self.entities_manager.clone();
-        self.base_mut().add_child(&entities_manager);
     }
 }

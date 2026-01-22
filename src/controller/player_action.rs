@@ -12,15 +12,13 @@ pub enum PlayerActionType {
 pub struct PlayerAction {
     hit: Option<Gd<LookAt>>,
     action_type: PlayerActionType,
-    world_slug: String,
 }
 
 impl PlayerAction {
-    pub fn create(hit: Option<Gd<LookAt>>, action_type: PlayerActionType, world_slug: String) -> Self {
+    pub fn create(hit: Option<Gd<LookAt>>, action_type: PlayerActionType) -> Self {
         Self {
             hit,
             action_type,
-            world_slug,
         }
     }
 
@@ -40,9 +38,5 @@ impl PlayerAction {
             PlayerActionType::Main => false,
             PlayerActionType::Second => true,
         }
-    }
-
-    pub fn get_world_slug(&self) -> &String {
-        &self.world_slug
     }
 }
