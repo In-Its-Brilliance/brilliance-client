@@ -1,12 +1,10 @@
+use common::utils::debug::format_grouped_lines::format_grouped_lines;
+use common::utils::debug::runtime_storage::SpansType;
 use godot::classes::performance::Monitor;
 use godot::classes::{Engine, Performance};
 use godot::obj::Singleton;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-
-use crate::debug::format_grouped_lines::format_grouped_lines;
-
-use super::runtime_storage::{LastType, SpansType};
 
 const REPORT_COOLDOWN: Duration = Duration::from_secs(10);
 
@@ -54,7 +52,7 @@ fn godot_stats() -> String {
 }
 
 impl RuntimeReporter {
-    pub fn report(spans: &SpansType, last: &LastType) -> bool {
+    pub fn report(spans: &SpansType) -> bool {
         if spans.is_empty() {
             return false;
         }
@@ -76,10 +74,13 @@ impl RuntimeReporter {
 
         let mut items: Vec<(&'static str, Duration, Duration)> = spans
             .iter()
-            .map(|(name, (total, count))| {
-                let avg = *total / *count;
-                let last = *last.get(name).unwrap_or(&Duration::ZERO);
-                (*name, last, avg)
+            .map(|(name, (total, count, last))| {
+                let avg = if *count > 0 {
+                    *total / *count
+                } else {
+                    Duration::ZERO
+                };
+                (*name, *last, avg)
             })
             .collect();
 

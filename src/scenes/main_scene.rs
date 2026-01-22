@@ -533,7 +533,10 @@ impl INode for MainScene {
             self.trace_flush_counter = self.trace_flush_counter.wrapping_add(1);
             if self.trace_flush_counter % TRACE_FLUSH_EVERY_N_FRAMES == 0 {
                 if let Ok(mut storage) = crate::debug::STORAGE.try_lock() {
-                    storage.flush();
+                    let clear = crate::debug::runtime_reporter::RuntimeReporter::report(storage.get_spans());
+                    if clear {
+                        storage.clear();
+                    }
                 }
             }
         }
