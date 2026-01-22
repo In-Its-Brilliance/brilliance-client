@@ -82,7 +82,7 @@ pub struct MainScene {
     #[export]
     worlde_environment: Option<Gd<WorldEnvironment>>,
 
-    #[cfg(feature = "trace")]
+    #[cfg(debug_assertions)]
     #[init(val = 0)]
     trace_flush_counter: u32,
 }
@@ -513,7 +513,7 @@ impl INode for MainScene {
             }
         }
 
-        #[cfg(feature = "trace")]
+        #[cfg(debug_assertions)]
         {
             self.trace_flush_counter = self.trace_flush_counter.wrapping_add(1);
             if self.trace_flush_counter % TRACE_FLUSH_EVERY_N_FRAMES == 0 {

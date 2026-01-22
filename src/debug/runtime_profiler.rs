@@ -5,9 +5,9 @@ pub struct RuntimeSpan {
     start: Instant,
 }
 
-impl RuntimeProfiler {
-    pub fn new(name: &'static str) -> RuntimeSpan {
-        RuntimeSpan {
+impl RuntimeSpan {
+    pub fn new(name: &'static str) -> Self {
+        Self {
             name,
             start: Instant::now(),
         }

@@ -608,5 +608,9 @@ impl INode3D for PlayerController {
             physics_pos.z,
         ));
 
+        {
+            let _s = crate::span!("player_controller.process::update_cache_movement");
+            self.update_cache_movement();
+        }
     }
 }

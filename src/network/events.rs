@@ -42,7 +42,7 @@ fn get_world_mut(worlds_manager: &mut WorldsManager, world_slug: String) -> Opti
     Some(world)
 }
 
-#[cfg(feature = "trace")]
+#[cfg(debug_assertions)]
 fn span_name_for_event(event: &ServerMessages) -> &'static str {
     match event {
         ServerMessages::AllowConnection => "network.handle_network_events::AllowConnection",
@@ -86,6 +86,7 @@ pub fn handle_network_events(main: &mut MainScene) -> Result<NetworkInfo, String
 
     // Recieve decoded server messages from network thread
     for event in network.iter_server_messages() {
+        #[cfg(debug_assertions)]
         let _span = crate::span!(span_name_for_event(&event));
 
         handle_event(&*network, main, event)?;
