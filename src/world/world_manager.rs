@@ -145,7 +145,7 @@ impl INode for WorldManager {
 
         #[cfg(feature = "trace")]
         let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("world_manager.physics_process"))
+            Some(crate::debug::span!("world_manager.physics_process"))
         } else {
             None
         };

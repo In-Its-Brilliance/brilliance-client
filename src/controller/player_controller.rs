@@ -626,12 +626,7 @@ impl INode3D for PlayerController {
         ));
 
         {
-            #[cfg(feature = "trace")]
-            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                Some(crate::debug::PROFILER.span("player_controller.process::update_cache_movement"))
-            } else {
-                None
-            };
+            let _s = crate::span!("player_controller.process::update_cache_movement");
             self.update_cache_movement();
         }
     }

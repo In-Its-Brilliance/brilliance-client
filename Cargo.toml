@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [features]
-default = ["trace"]
+default = []
 
 trace = ["tracing", "tracing-tracy", "tracy-client", "tracy-client-sys", "tracing-subscriber"]
 
