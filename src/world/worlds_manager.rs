@@ -230,12 +230,7 @@ impl WorldsManager {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("worlds_manager.handler_player_move");
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("worlds_manager.handler_player_move"))
-        } else {
-            None
-        };
+        let _span = crate::span!("worlds_manager.handler_player_move");
 
         let world = self.world.as_ref().unwrap().bind();
 

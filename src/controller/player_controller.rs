@@ -498,12 +498,7 @@ impl INode3D for PlayerController {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("player_controller.process");
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("player_controller.process"))
-        } else {
-            None
-        };
+        let _span = crate::span!("player_controller.process");
 
         self.ui_lock = (self.ui_lock - delta as f32).max(0.0);
 
@@ -549,13 +544,11 @@ impl INode3D for PlayerController {
 
         if !self.frozen {
             {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.process::detect_is_grounded"))
-                } else {
-                    None
-                };
-
+                let _s = crate::span!("player_controller.process::update_cache_movement");
+                self.update_cache_movement();
+            }
+            {
+                let _span = crate::span!("player_controller.process::detect_is_grounded");
                 self.detect_is_grounded(delta);
             }
 
@@ -571,12 +564,7 @@ impl INode3D for PlayerController {
             let translation = if movement == Vector3::ZERO {
                 Vector3::ZERO.to_network()
             } else {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.process::move_shape"))
-                } else {
-                    None
-                };
+                let _span = crate::span!("player_controller.process::move_shape");
 
                 self.character_controller
                     .move_shape(&self.collider, filter, delta, movement.to_network())
@@ -585,12 +573,7 @@ impl INode3D for PlayerController {
             self.collider.set_position(self.collider.get_position() + translation);
 
             let hit = {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("player_controller.process::update_vision"))
-                } else {
-                    None
-                };
+                let _span = crate::span!("player_controller.process::update_vision");
 
                 self.update_vision()
             };
@@ -625,9 +608,5 @@ impl INode3D for PlayerController {
             physics_pos.z,
         ));
 
-        {
-            let _s = crate::span!("player_controller.process::update_cache_movement");
-            self.update_cache_movement();
-        }
     }
 }
