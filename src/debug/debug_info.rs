@@ -1,3 +1,11 @@
+use godot::{
+    classes::{
+        performance::Monitor, rendering_server::RenderingInfo, Engine, HBoxContainer, IMarginContainer,
+        MarginContainer, Performance, RenderingServer, RichTextLabel, VBoxContainer,
+    },
+    prelude::*,
+};
+use lazy_static::lazy_static;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -5,13 +13,6 @@ use std::sync::{
 
 use crate::world::{chunks::chunks_map::LIMIT_CHUNK_LOADING_AT_A_TIME, worlds_manager::WorldsManager};
 use common::chunks::block_position::{BlockPosition, BlockPositionTrait};
-use godot::{
-    classes::{
-        performance::Monitor, rendering_server::RenderingInfo, Engine, HBoxContainer, IMarginContainer, MarginContainer, Performance, RenderingServer, RichTextLabel, VBoxContainer
-    },
-    prelude::*,
-};
-use lazy_static::lazy_static;
 use network::client::NetworkInfo;
 
 lazy_static! {
@@ -72,6 +73,12 @@ pub struct DebugInfo {
     first_row: Gd<HBoxContainer>,
     world_row: Gd<HBoxContainer>,
     network_row: Gd<HBoxContainer>,
+
+    pub(crate) worlds_manager: Option<Gd<WorldsManager>>,
+
+    network_info: Option<NetworkInfo>,
+
+    accum_time: f64,
 }
 
 impl DebugInfo {
@@ -94,27 +101,75 @@ impl DebugInfo {
         self.base_mut().set_visible(DebugInfo::is_active());
     }
 
-    pub fn update_debug(&mut self, worlds_manager: &Gd<WorldsManager>, network_info: NetworkInfo) {
+    pub fn set_network_info(&mut self, network_info: NetworkInfo) {
+        self.network_info = Some(network_info)
+    }
+}
+
+#[godot_api]
+impl IMarginContainer for DebugInfo {
+    fn init(base: Base<MarginContainer>) -> Self {
+        Self {
+            base: base,
+            first_row: DebugInfo::load_row(),
+            world_row: DebugInfo::load_row(),
+            network_row: DebugInfo::load_row(),
+            worlds_manager: None,
+            network_info: None,
+            accum_time: 0.0,
+        }
+    }
+
+    fn ready(&mut self) {
+        self.base_mut().set_visible(false);
+
+        let mut base = self
+            .base()
+            .get_node_as::<VBoxContainer>("MarginContainer/VBoxContainer");
+        base.add_child(&self.first_row);
+        base.add_child(&self.world_row);
+        base.add_child(&self.network_row);
+    }
+
+    fn process(&mut self, delta: f64) {
         if !DebugInfo::is_active() {
             return;
         }
+
+        self.accum_time += delta;
+        if self.accum_time < 0.25 {
+            return;
+        }
+        self.accum_time = 0.0;
+
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("debug_info.process");
+
+        #[cfg(feature = "trace")]
+        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
+            Some(crate::debug::PROFILER.span("debug_info.process"))
+        } else {
+            None
+        };
 
         let mut rendering_server = RenderingServer::singleton();
         let performance = Performance::singleton();
         let first_text = format!(
             debug_first_string!(),
-            fps_color=fps_bbcode_color(Engine::singleton().get_frames_per_second()),
-            fps=Engine::singleton().get_frames_per_second(),
+            fps_color = fps_bbcode_color(Engine::singleton().get_frames_per_second()),
+            fps = Engine::singleton().get_frames_per_second(),
             process = performance.get_monitor(Monitor::TIME_PROCESS),
             physics = performance.get_monitor(Monitor::TIME_PHYSICS_PROCESS),
-            total_objects_in_frame=rendering_server.get_rendering_info(RenderingInfo::TOTAL_OBJECTS_IN_FRAME),
-            total_primitives_in_frame=rendering_server.get_rendering_info(RenderingInfo::TOTAL_PRIMITIVES_IN_FRAME) as f32 * 0.001,
-            total_draw_calls_in_frame=rendering_server.get_rendering_info(RenderingInfo::TOTAL_DRAW_CALLS_IN_FRAME),
-            video_mem_used=rendering_server.get_rendering_info(RenderingInfo::VIDEO_MEM_USED) as f32 / (1024.0 * 1024.0),
+            total_objects_in_frame = rendering_server.get_rendering_info(RenderingInfo::TOTAL_OBJECTS_IN_FRAME),
+            total_primitives_in_frame =
+                rendering_server.get_rendering_info(RenderingInfo::TOTAL_PRIMITIVES_IN_FRAME) as f32 * 0.001,
+            total_draw_calls_in_frame = rendering_server.get_rendering_info(RenderingInfo::TOTAL_DRAW_CALLS_IN_FRAME),
+            video_mem_used =
+                rendering_server.get_rendering_info(RenderingInfo::VIDEO_MEM_USED) as f32 / (1024.0 * 1024.0),
         );
         DebugInfo::change_text(&self.first_row, first_text);
 
-        let wm = worlds_manager.bind();
+        let wm = self.worlds_manager.as_ref().unwrap().bind();
         let world_text = match wm.get_world() {
             Some(w) => {
                 let player_controller = wm.get_player_controller().as_ref().unwrap().bind();
@@ -147,55 +202,34 @@ impl DebugInfo {
                 let chunk_map = world.get_chunk_map();
                 format!(
                     debug_world_string!(),
-                    world_slug=world.get_slug(),
-                    controller_positioin=controller_positioin,
-                    current_animation=match player_controller.get_current_animation() {
+                    world_slug = world.get_slug(),
+                    controller_positioin = controller_positioin,
+                    current_animation = match player_controller.get_current_animation() {
                         Some(s) => s,
                         None => String::from("-"),
                     },
-                    chunks_count=chunk_map.get_loaded_chunks_count(),
-                    chunks_loading=chunk_map.get_loading_chunks_count(),
-                    loading_limit=LIMIT_CHUNK_LOADING_AT_A_TIME,
-                    chunks_waiting=chunk_map.get_waiting_chunks_count(),
-                    chunk_pos=chunk_pos,
-                    chunk_info=chunk_info,
-                    look_at_message=player_controller.get_look_at_message(),
+                    chunks_count = chunk_map.get_loaded_chunks_count(),
+                    chunks_loading = chunk_map.get_loading_chunks_count(),
+                    loading_limit = LIMIT_CHUNK_LOADING_AT_A_TIME,
+                    chunks_waiting = chunk_map.get_waiting_chunks_count(),
+                    chunk_pos = chunk_pos,
+                    chunk_info = chunk_info,
+                    look_at_message = player_controller.get_look_at_message(),
                 )
             }
             None => "World: -".to_string(),
         };
         DebugInfo::change_text(&self.world_row, world_text);
 
-        let network_text = format!(
-            debug_network_string!(),
-            is_connected=!network_info.is_disconnected,
-            received_per_sec=network_info.bytes_received_per_sec / 1024.0,
-            sent_per_sec=network_info.bytes_sent_per_sec / 1024.0,
-            packet_loss=network_info.packet_loss / 1024.0,
-        );
-        DebugInfo::change_text(&self.network_row, network_text);
-    }
-}
-
-#[godot_api]
-impl IMarginContainer for DebugInfo {
-    fn init(base: Base<MarginContainer>) -> Self {
-        Self {
-            base: base,
-            first_row: DebugInfo::load_row(),
-            world_row: DebugInfo::load_row(),
-            network_row: DebugInfo::load_row(),
+        if let Some(network_info) = self.network_info.as_ref() {
+            let network_text = format!(
+                debug_network_string!(),
+                is_connected = !network_info.is_disconnected,
+                received_per_sec = network_info.bytes_received_per_sec / 1024.0,
+                sent_per_sec = network_info.bytes_sent_per_sec / 1024.0,
+                packet_loss = network_info.packet_loss / 1024.0,
+            );
+            DebugInfo::change_text(&self.network_row, network_text);
         }
-    }
-
-    fn ready(&mut self) {
-        self.base_mut().set_visible(false);
-
-        let mut base = self
-            .base()
-            .get_node_as::<VBoxContainer>("MarginContainer/VBoxContainer");
-        base.add_child(&self.first_row);
-        base.add_child(&self.world_row);
-        base.add_child(&self.network_row);
     }
 }

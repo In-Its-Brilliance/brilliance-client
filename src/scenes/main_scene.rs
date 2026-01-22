@@ -12,7 +12,6 @@ use crate::scenes::text_screen::TextScreen;
 use crate::utils::settings::GameSettings;
 use crate::utils::world_generator::generate_chunks;
 use crate::world::physics::PhysicsType;
-use crate::world::world_manager::WorldManager;
 use crate::world::worlds_manager::WorldsManager;
 use crate::{LOG_LEVEL, MAX_THREADS};
 use common::blocks::block_info::generate_block_id_map;
@@ -426,7 +425,8 @@ impl INode for MainScene {
             self.regenerate_debug_world(false);
         } else {
             // Debug
-            let debug_info = self.debug_info_scene.as_mut().unwrap().instantiate_as::<DebugInfo>();
+            let mut debug_info = self.debug_info_scene.as_mut().unwrap().instantiate_as::<DebugInfo>();
+            debug_info.bind_mut().worlds_manager = Some(self.worlds_manager.as_ref().unwrap().clone());
             self.debug_info.init(debug_info);
 
             let debug_info = self.debug_info.clone();
@@ -510,13 +510,11 @@ impl INode for MainScene {
             {
                 #[cfg(feature = "trace")]
                 let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("main_scene.process::update_debug"))
+                    Some(crate::debug::PROFILER.span("main_scene.process::set_network_info"))
                 } else {
                     None
                 };
-
-                let wm = self.worlds_manager.as_ref().unwrap();
-                self.debug_info.bind_mut().update_debug(wm, network_info);
+                self.debug_info.bind_mut().set_network_info(network_info);
             }
         }
 
