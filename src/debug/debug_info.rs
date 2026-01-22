@@ -145,12 +145,7 @@ impl IMarginContainer for DebugInfo {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("debug_info.process");
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("debug_info.process"))
-        } else {
-            None
-        };
+        let _span = crate::span!("debug_info.process");
 
         let mut rendering_server = RenderingServer::singleton();
         let performance = Performance::singleton();

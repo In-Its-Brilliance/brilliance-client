@@ -481,21 +481,11 @@ impl INode for MainScene {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("main_scene.process");
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("main_scene.process"))
-        } else {
-            None
-        };
+        let _span = crate::span!("main_scene.process");
 
         if self.network.is_some() {
             let network_info = {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("main_scene.process::handle_network_events"))
-                } else {
-                    None
-                };
+                let _span = crate::span!("main_scene.process::handle_network_events");
 
                 match handle_network_events(self) {
                     Ok(i) => i,
@@ -508,12 +498,7 @@ impl INode for MainScene {
             };
 
             {
-                #[cfg(feature = "trace")]
-                let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                    Some(crate::debug::PROFILER.span("main_scene.process::set_network_info"))
-                } else {
-                    None
-                };
+                let _span = crate::span!("main_scene.process::set_network_info");
                 self.debug_info.bind_mut().set_network_info(network_info);
             }
         }

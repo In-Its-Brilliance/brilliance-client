@@ -157,20 +157,10 @@ impl INode for WorldManager {
         #[cfg(feature = "trace")]
         let _span = tracy_client::span!("world_manager.custom_process");
 
-        #[cfg(feature = "trace")]
-        let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-            Some(crate::debug::PROFILER.span("world_manager.custom_process"))
-        } else {
-            None
-        };
+        let _span = crate::span!("world_manager.custom_process");
 
         {
-            #[cfg(feature = "trace")]
-            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                Some(crate::debug::PROFILER.span("world_manager.custom_process::send_chunks_to_load"))
-            } else {
-                None
-            };
+            let _span = crate::span!("world_manager.custom_process::send_chunks_to_load");
 
             let map = self.chunk_map.bind();
             map.send_chunks_to_load(
@@ -183,24 +173,14 @@ impl INode for WorldManager {
         }
 
         {
-            #[cfg(feature = "trace")]
-            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                Some(crate::debug::PROFILER.span("world_manager.custom_process::spawn_loaded_chunks"))
-            } else {
-                None
-            };
+            let _span = crate::span!("world_manager.custom_process::spawn_loaded_chunks");
 
             let mut map = self.chunk_map.bind_mut();
             map.spawn_loaded_chunks(&self.physics);
         }
 
         {
-            #[cfg(feature = "trace")]
-            let _span = if crate::debug::debug_info::DebugInfo::is_active() {
-                Some(crate::debug::PROFILER.span("world_manager.custom_process::update_geometry"))
-            } else {
-                None
-            };
+            let _span = crate::span!("world_manager.custom_process::update_geometry");
 
             let bs = self.block_storage.read();
             let tm = self.texture_mapper.read();
