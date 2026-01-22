@@ -13,7 +13,7 @@ macro_rules! lags_template {
         "&cLags detected! ({fps} fps):&r
 &cGodot:&r
 {godot}
-&cProcess {process:.1}ms:&r
+&cProcess {process:.1}ms (calculated: {duration:.1}ms):&r
 {lines}"
     };
 }
@@ -75,11 +75,7 @@ impl RuntimeReporter {
         let mut items: Vec<(&'static str, Duration, Duration)> = spans
             .iter()
             .map(|(name, (total, count, last))| {
-                let avg = if *count > 0 {
-                    *total / *count
-                } else {
-                    Duration::ZERO
-                };
+                let avg = if *count > 0 { *total / *count } else { Duration::ZERO };
                 (*name, *last, avg)
             })
             .collect();
@@ -88,11 +84,13 @@ impl RuntimeReporter {
 
         let process = Performance::singleton().get_monitor(Monitor::TIME_PROCESS);
 
+        let (lines, duration) = format_grouped_lines(items);
         let msg = format!(
             lags_template!(),
             godot = godot_stats(),
             process = process * 1000.0,
-            lines = format_grouped_lines(items),
+            duration = duration.as_secs_f64() * 1000.0,
+            lines = lines,
             fps = fps,
         );
 

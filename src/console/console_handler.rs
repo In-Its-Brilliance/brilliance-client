@@ -141,8 +141,9 @@ impl Console {
                 .map(|s| s.to_string())
                 .collect();
 
-            let overflow = (line_count - MAX_LINES) as usize;
+            let overflow = lines.len().saturating_sub(MAX_LINES as usize);
             lines.drain(0..overflow);
+
             console_text.set_text(&lines.join("\n"));
         }
 
@@ -384,6 +385,10 @@ impl IMarginContainer for Console {
     }
 
     fn process(&mut self, _delta: f64) {
+        #[cfg(feature = "trace")]
+        let _span = tracy_client::span!("console_handler.process");
+        let _span = crate::span!("console_handler.process");
+
         for message in CONSOLE_OUTPUT_CHANNEL.1.drain() {
             self.append_text(message);
         }
