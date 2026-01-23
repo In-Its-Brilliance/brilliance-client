@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "brilliance-client"
-version = "0.1.36"
+version = "0.1.37"
 dependencies = [
  "ahash",
  "arrayvec 0.7.6",

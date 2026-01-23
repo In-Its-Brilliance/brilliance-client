@@ -13,7 +13,7 @@ macro_rules! lags_template {
         "&cLags detected! ({fps} fps):&r
 &cGodot:&r
 {godot}
-&cProcess {process:.1}ms (calculated: {duration:.1}ms):&r
+&cProcess {process:?} (calculated: {duration:?}):&r
 {lines}"
     };
 }
@@ -37,12 +37,12 @@ fn godot_stats() -> String {
     let vram = p.get_monitor(Monitor::RENDER_VIDEO_MEM_USED) / 1024.0 / 1024.0;
 
     format!(
-        "  &acpu process &7{:.1}ms &r| &aphysics &7{:.1}ms
-  &anavigation &7{:.1}ms &r| &arender draws &7{:.0} &r| &aobjects &7{:.0}
+        "  &acpu process &7{:?} &r| &aphysics &7{:?}
+  &anavigation &7{:?} &r| &arender draws &7{:.0} &r| &aobjects &7{:.0}
   &aprimitives &7{:.0} &r| &amemory ram &7{:.1}MB &r| &avram &7{:.1}MB",
-        process * 1000.0,
-        physics * 1000.0,
-        navigation * 1000.0,
+        Duration::from_secs_f64(process),
+        Duration::from_secs_f64(physics),
+        Duration::from_secs_f64(navigation),
         draw_calls,
         objects,
         primitives,
@@ -88,8 +88,8 @@ impl RuntimeReporter {
         let msg = format!(
             lags_template!(),
             godot = godot_stats(),
-            process = process * 1000.0,
-            duration = duration.as_secs_f64() * 1000.0,
+            process = Duration::from_secs_f64(process),
+            duration = duration,
             lines = lines,
             fps = fps,
         );

@@ -137,7 +137,7 @@ impl IMarginContainer for DebugInfo {
         }
 
         self.accum_time += delta;
-        if self.accum_time < 0.25 {
+        if self.accum_time < 0.5 {
             return;
         }
         self.accum_time = 0.0;

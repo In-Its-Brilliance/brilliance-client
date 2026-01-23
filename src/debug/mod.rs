@@ -12,22 +12,21 @@ pub mod runtime_profiler;
 #[cfg(debug_assertions)]
 pub mod runtime_reporter;
 
+#[cfg(debug_assertions)]
 #[macro_export]
 macro_rules! span {
-    ($name:expr) => {{
-        #[cfg(debug_assertions)]
-        {
-            if $crate::debug::debug_info::DebugInfo::is_active() {
-                Some($crate::debug::runtime_profiler::RuntimeSpan::new($name))
-            } else {
-                None
-            }
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            None
-        }
-    }};
+    ($name:expr) => {
+        $crate::debug::debug_info::DebugInfo::is_active()
+            .then(|| $crate::debug::runtime_profiler::RuntimeSpan::new($name))
+    };
+}
+
+#[cfg(not(debug_assertions))]
+#[macro_export]
+macro_rules! span {
+    ($name:expr) => {
+        None::<$crate::debug::runtime_profiler::RuntimeSpan>
+    };
 }
 
 #[cfg(debug_assertions)]

@@ -180,7 +180,7 @@ impl INode for WorldManager {
         }
 
         {
-            let _span = crate::span!("world_manager.custom_process::update_geometry");
+            let _span = crate::span!("world_manager.custom_process::update_chunks_geometry");
 
             let bs = self.block_storage.read();
             let tm = self.texture_mapper.read();
