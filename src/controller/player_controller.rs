@@ -18,8 +18,6 @@ use crate::world::worlds_manager::WorldsManager;
 use common::blocks::block_info::BlockFace;
 use common::chunks::chunk_data::BlockDataInfo;
 use common::chunks::rotation::Rotation;
-use godot::classes::input::MouseMode;
-use godot::classes::Input;
 use godot::global::{deg_to_rad, lerp_angle};
 use godot::prelude::*;
 use network::entities::EntityNetworkComponent;
@@ -60,7 +58,7 @@ pub struct PlayerController {
     character_controller: PhysicsCharacterController,
 
     vertical_movement: f32,
-    is_grounded: bool,
+    _is_grounded: bool,
     grounded_timer: f32,
 
     look_at_message: String,
@@ -73,8 +71,6 @@ pub struct PlayerController {
 
     // To prevent actions after ui windows closed
     ui_lock: f32,
-
-    window_focus: bool,
 
     camera_mode: CameraMode,
 
@@ -112,7 +108,7 @@ impl PlayerController {
             collider,
 
             vertical_movement: 0.0,
-            is_grounded: false,
+            _is_grounded: false,
             grounded_timer: 0.0,
 
             look_at_message: Default::default(),
@@ -123,8 +119,6 @@ impl PlayerController {
             block_menu: block_menu,
 
             ui_lock: 0.0,
-
-            window_focus: true,
             camera_mode: CameraMode::FirstPerson,
 
             frozen: false,
@@ -239,7 +233,7 @@ impl PlayerController {
     /// grounded_timer counting the time:
     /// positive - how long grounded
     /// negative - how long not grounded
-    fn detect_is_grounded(&mut self, delta: f64) {
+    fn update_is_grounded(&mut self, delta: f64) {
         let ray_direction = RayDirection {
             dir: Vector3::new(0.0, -1.0, 0.0),
             from: self.collider.get_position().to_godot(),
@@ -250,12 +244,12 @@ impl PlayerController {
         filter.exclude_sensors();
         filter.collision_mask(PLAYER_GROUP, WORLD_NEAR_GROUP);
 
-        self.is_grounded = self
+        self._is_grounded = self
             .physics
             .cast_shape(self.collider.get_shape(), ray_direction, filter)
             .is_some();
 
-        if self.is_grounded {
+        if self._is_grounded {
             self.grounded_timer = self.grounded_timer.max(0.0);
             self.grounded_timer += delta as f32;
         } else {
@@ -264,7 +258,17 @@ impl PlayerController {
         }
     }
 
-    fn get_movement(&mut self, delta: f64) -> Vector3 {
+    fn is_grounded(&self) -> bool {
+        self._is_grounded
+    }
+
+    /// Вычисляет вектор движения персонажа на основе пользовательского ввода.
+    ///
+    /// Обрабатывает горизонтальное перемещение с учётом режима камеры:
+    /// - `FirstPerson`: движение привязано к направлению взгляда камеры
+    /// - `ThirdPerson`: персонаж плавно поворачивается в направлении движения
+    ///
+    fn get_controller_movement(&mut self, delta: f64) -> Vector3 {
         let Some(entity) = self.entity.as_mut() else {
             panic!("get_movement available only with entity");
         };
@@ -306,23 +310,17 @@ impl PlayerController {
                 movement = entity.bind().get_transform().basis.col_c() * -1.0 * MOVEMENT_SPEED;
             }
         }
-        if self.grounded_timer > 0.0 {
+        movement
+    }
+
+    fn get_vertical_movement(&mut self, delta: f64) -> f32 {
+        if self.is_grounded() {
             self.vertical_movement = 0.0;
         } else {
             let custom_mass = self.character_controller.get_custom_mass().unwrap_or(1.0);
             self.vertical_movement += CHARACTER_GRAVITY * delta as f32 * custom_mass;
         }
-
-        // Check physics ground check
-        if controls.is_jumping() && self.grounded_timer > -0.1 && !Console::is_active() {
-            entity.bind_mut().trigger_animation(GenericAnimations::Jump);
-            self.vertical_movement = JUMP_SPEED;
-        }
-
-        movement.y = self.vertical_movement;
-        movement *= delta as f32;
-
-        movement
+        self.vertical_movement
     }
 
     pub fn update_vision(&mut self) -> Option<Gd<LookAt>> {
@@ -419,17 +417,6 @@ impl PlayerController {
         self.ui_lock = 0.1;
     }
 
-    #[func]
-    fn on_window_focus_entered(&mut self) {
-        self.window_focus = true;
-        self.ui_lock = 0.1;
-    }
-
-    #[func]
-    fn on_window_focus_exited(&mut self) {
-        self.window_focus = false;
-    }
-
     /// Handle camera rotation from Rotation object
     #[func]
     fn on_camera_rotation(&mut self, yaw: f32, pitch: f32) {
@@ -455,20 +442,6 @@ impl INode3D for PlayerController {
             .on_camera_rotation()
             .connect_other(&self.to_gd(), Self::on_camera_rotation);
         self.base_mut().add_child(&camera_controller);
-
-        self.base()
-            .get_window()
-            .unwrap()
-            .signals()
-            .focus_entered()
-            .connect_other(&self.to_gd(), PlayerController::on_window_focus_entered);
-
-        self.base()
-            .get_window()
-            .unwrap()
-            .signals()
-            .focus_exited()
-            .connect_other(&self.to_gd(), PlayerController::on_window_focus_exited);
 
         let controls = self.controls.clone();
         self.base_mut().add_child(&controls);
@@ -544,15 +517,28 @@ impl INode3D for PlayerController {
 
         if !self.frozen {
             {
-                let _s = crate::span!("player_controller.process::update_cache_movement");
-                self.update_cache_movement();
-            }
-            {
-                let _span = crate::span!("player_controller.process::detect_is_grounded");
-                self.detect_is_grounded(delta);
+                let _span = crate::span!("player_controller.process::update_is_grounded");
+                self.update_is_grounded(delta);
             }
 
-            let movement = self.get_movement(delta);
+            // Jump
+            let is_groundeded = self.is_groundeded();
+            if let Some(entity) = self.entity.as_mut() {
+                let controls = self.controls.bind();
+                if controls.is_jumping() && is_groundeded && !Console::is_active() {
+                    entity.bind_mut().trigger_animation(GenericAnimations::Jump);
+                    self.vertical_movement = JUMP_SPEED;
+                    log::info!("self.vertical_movement {}", self.vertical_movement);
+                }
+            }
+
+            let mut movement = {
+                let _span = crate::span!("player_controller.process::get_controller_movement");
+                self.get_controller_movement(delta)
+            };
+
+            movement.y = self.get_vertical_movement(delta);
+            movement *= delta as f32;
 
             let mut filter = QueryFilter::default();
             filter.exclude_sensors();
@@ -589,13 +575,10 @@ impl INode3D for PlayerController {
 
             if let Some(action_type) = action_type {
                 let action = Gd::<PlayerAction>::from_init_fn(|_base| PlayerAction::create(hit, action_type));
-                let captured = Input::singleton().get_mouse_mode() == MouseMode::CAPTURED;
-                if captured && self.ui_lock <= 0.0 && self.window_focus {
-                    let selected_item = Gd::<SelectedItemGd>::from_init_fn(|_base| {
-                        SelectedItemGd::create(self.get_selected_item().clone())
-                    });
-                    self.signals().player_action().emit(&action, &selected_item);
-                }
+                let selected_item = Gd::<SelectedItemGd>::from_init_fn(|_base| {
+                    SelectedItemGd::create(self.get_selected_item().clone())
+                });
+                self.signals().player_action().emit(&action, &selected_item);
             }
         }
 

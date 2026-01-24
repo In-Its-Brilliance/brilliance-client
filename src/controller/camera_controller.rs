@@ -1,5 +1,6 @@
 use common::chunks::rotation::Rotation;
-use godot::classes::{Camera3D, Sprite2D};
+use godot::classes::input::MouseMode;
+use godot::classes::{Camera3D, Input, Sprite2D};
 use godot::prelude::*;
 
 use super::controls::Controls;
@@ -19,6 +20,8 @@ pub struct CameraController {
     controls: Gd<Controls>,
     cross: Gd<Sprite2D>,
 
+    window_focus: bool,
+
     _stored_rotation: Option<Rotation>,
 }
 
@@ -31,6 +34,7 @@ impl CameraController {
             camera: Camera3D::new_alloc(),
             controls,
             cross,
+            window_focus: true,
             _stored_rotation: Default::default(),
         }
     }
@@ -81,6 +85,16 @@ impl CameraController {
     pub fn on_camera_rotation(yaw: f32, pitch: f32);
 
     #[func]
+    fn on_window_focus_entered(&mut self) {
+        self.window_focus = true;
+    }
+
+    #[func]
+    fn on_window_focus_exited(&mut self) {
+        self.window_focus = false;
+    }
+
+    #[func]
     fn on_viewport_size_changed(&mut self) {
         let screen = self.camera.get_viewport().unwrap().get_visible_rect().size;
         self.cross.set_position(screen * 0.5);
@@ -103,6 +117,20 @@ impl INode3D for CameraController {
             "size_changed",
             &Callable::from_object_method(&self.base().to_godot(), "on_viewport_size_changed"),
         );
+
+        self.base()
+            .get_window()
+            .unwrap()
+            .signals()
+            .focus_entered()
+            .connect_other(&self.to_gd(), Self::on_window_focus_entered);
+
+        self.base()
+            .get_window()
+            .unwrap()
+            .signals()
+            .focus_exited()
+            .connect_other(&self.to_gd(), Self::on_window_focus_exited);
     }
 
     fn process(&mut self, _delta: f64) {
@@ -116,11 +144,17 @@ impl INode3D for CameraController {
             controls.get_camera_rotation().clone()
         };
 
+        let captured = Input::singleton().get_mouse_mode() == MouseMode::CAPTURED;
+        if !captured || !self.window_focus {
+            return;
+        }
+
         let rotation = Rotation::new(cam_rot.x, cam_rot.y);
         let rotate_changed = match self._stored_rotation.as_ref() {
             Some(r) => *r != rotation,
             None => true,
         };
+
         if rotate_changed {
             self.rotate(rotation);
             self.signals().on_camera_rotation().emit(rotation.yaw, rotation.pitch);

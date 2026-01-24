@@ -167,6 +167,9 @@ impl ChunkSection {
     }
 
     pub fn destory(&mut self) {
+        if let Some(mut collider) = self.collider.take() {
+            collider.remove();
+        }
         self.objects_container.bind_mut().destory();
     }
 }
