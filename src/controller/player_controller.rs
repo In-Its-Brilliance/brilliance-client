@@ -24,6 +24,8 @@ use network::entities::EntityNetworkComponent;
 use network::messages::NetworkEntitySkin;
 use physics::physics::{IPhysicsCharacterController, IPhysicsCollider, IPhysicsColliderBuilder, IQueryFilter};
 use physics::{PhysicsCharacterController, PhysicsCollider, PhysicsColliderBuilder, QueryFilter};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 const TURN_SPEED: f64 = 6.0;
 const MOVEMENT_SPEED: f32 = 4.0;
@@ -74,7 +76,7 @@ pub struct PlayerController {
 
     camera_mode: CameraMode,
 
-    frozen: bool,
+    frozen: Arc<AtomicBool>,
 }
 
 impl PlayerController {
@@ -121,12 +123,16 @@ impl PlayerController {
             ui_lock: 0.0,
             camera_mode: CameraMode::FirstPerson,
 
-            frozen: false,
+            frozen: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn set_frozen(&mut self, state: bool) {
-        self.frozen = state
+    pub fn set_frozen(&self, state: bool) {
+        self.frozen.store(state, Ordering::Relaxed);
+    }
+
+    fn is_frozen(&self) -> bool {
+        self.frozen.load(Ordering::Relaxed)
     }
 
     pub fn set_selected_item(&mut self, new_item: Option<SelectedItem>) {
@@ -265,7 +271,7 @@ impl PlayerController {
     fn jump(&mut self) {
         self.grounded_timer = -0.1;
         self.vertical_movement = JUMP_SPEED;
-        
+
         if let Some(entity) = self.entity.as_mut() {
             entity.bind_mut().trigger_animation(GenericAnimations::Jump);
         }
@@ -522,7 +528,7 @@ impl INode3D for PlayerController {
             self.set_selected_item(self.selected_item.clone());
         }
 
-        if !self.frozen {
+        if !self.is_frozen() {
             {
                 let _span = crate::span!("player_controller.process::update_is_grounded");
                 self.update_is_grounded(delta);

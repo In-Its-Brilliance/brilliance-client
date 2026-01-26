@@ -121,7 +121,8 @@ impl ChunkSection {
             self.transparancy = 1.0;
             mesh.set_transparency(self.transparancy);
         } else {
-            self.base_mut().set_process(false);
+            // self.base_mut().set_process(false);
+            self.base_mut().call_deferred("set_process", &[false.to_variant()]);
         }
     }
 

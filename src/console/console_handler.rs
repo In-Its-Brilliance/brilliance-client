@@ -164,7 +164,9 @@ impl Console {
             if !console_input.has_focus() {
                 console_input.grab_focus();
             }
+            console_input.set_block_signals(true);
             console_input.clear();
+            console_input.set_block_signals(false);
 
             Input::singleton().set_mouse_mode(MouseMode::VISIBLE);
         } else {
@@ -201,8 +203,11 @@ impl Console {
 
         self.handle_command(&command);
 
-        self.console_input.as_mut().unwrap().clear();
-        self.console_input.as_mut().unwrap().call_deferred("grab_focus", &[]);
+        let console_input = self.console_input.as_mut().unwrap();
+        console_input.set_block_signals(true);
+        console_input.clear();
+        console_input.set_block_signals(false);
+        console_input.call_deferred("grab_focus", &[]);
     }
 
     fn generate_completions(&mut self) {
@@ -292,11 +297,11 @@ impl Console {
 
         let (new_input, caret_column) = apply_complete(&complitions, &complition);
 
-        // Set text
-        self.console_input.as_mut().unwrap().set_text(&new_input);
-
-        // Set cursor position
-        self.console_input.as_mut().unwrap().set_caret_column(caret_column);
+        let console_input = self.console_input.as_mut().unwrap();
+        console_input.set_block_signals(true);
+        console_input.set_text(&new_input);
+        console_input.set_caret_column(caret_column);
+        console_input.set_block_signals(false);
 
         self.clear_completions();
     }

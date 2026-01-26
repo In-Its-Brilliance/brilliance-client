@@ -270,11 +270,11 @@ impl WorldsManager {
     pub fn chunk_loeded(&mut self, chunk_position: Gd<ChunkPositionGd>) {
         let chunk_position = chunk_position.bind().get_inner().clone();
 
-        if let Some(player_controller) = self.player_controller.as_mut() {
+        if let Some(player_controller) = self.player_controller.as_ref() {
             let chunk_pos = player_controller.get_position().to_chunk_position();
 
             if chunk_pos == chunk_position {
-                player_controller.bind_mut().set_frozen(false);
+                player_controller.bind().set_frozen(false);
             }
         }
     }
