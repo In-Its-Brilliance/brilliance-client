@@ -120,6 +120,8 @@ impl ChunkSection {
             self.set_geometry_first_time = true;
             self.transparancy = 1.0;
             mesh.set_transparency(self.transparancy);
+        } else {
+            self.base_mut().set_process(false);
         }
     }
 
@@ -200,6 +202,8 @@ impl INode3D for ChunkSection {
 
             let mesh_transparent = self.mesh_transparent.borrow_mut();
             mesh_transparent.set_transparency(self.transparancy);
+        } else {
+            self.base_mut().set_process(false);
         }
     }
 }
