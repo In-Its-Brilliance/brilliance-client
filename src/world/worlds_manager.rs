@@ -13,7 +13,7 @@ use crate::controller::entity_movement::EntityMovement;
 use crate::controller::player_controller::PlayerController;
 use crate::scenes::components::block_mesh_storage::BlockMeshStorage;
 use crate::scenes::main_scene::ResourceManagerType;
-use crate::utils::bridge::IntoChunkPositionVector;
+use crate::utils::bridge::{ChunkPositionGd, IntoChunkPositionVector};
 use crate::utils::textures::texture_mapper::TextureMapper;
 
 pub type TextureMapperType = Arc<RwLock<TextureMapper>>;
@@ -195,7 +195,17 @@ impl WorldsManager {
             .base_mut()
             .set_name(&format!("World \"{}\"", world_slug));
 
-        self.base_mut().add_child(&world.clone());
+        self.base_mut().add_child(&world);
+
+        {
+            let mut world = world.bind_mut();
+            let mut chunk_map = world.get_chunk_map_mut();
+            chunk_map
+                .signals()
+                .chunk_loeded()
+                .connect_other(&self.to_gd(), Self::chunk_loeded);
+        }
+
         self.world = Some(world.clone());
 
         log::info!(target: "world", "World \"{}\" created; (executed:{:.2?})", self.world.as_ref().unwrap().bind().get_slug(), now.elapsed());
@@ -253,6 +263,18 @@ impl WorldsManager {
                 let is_near = chunk_column.get_position().to_chunk_position().get_distance(&new_chunk) < NEAR_DISTANCE;
 
                 chunk_column.update_collider_group(is_near);
+            }
+        }
+    }
+
+    pub fn chunk_loeded(&mut self, chunk_position: Gd<ChunkPositionGd>) {
+        let chunk_position = chunk_position.bind().get_inner().clone();
+
+        if let Some(player_controller) = self.player_controller.as_mut() {
+            let chunk_pos = player_controller.get_position().to_chunk_position();
+
+            if chunk_pos == chunk_position {
+                player_controller.bind_mut().set_frozen(false);
             }
         }
     }

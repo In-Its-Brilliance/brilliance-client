@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     client_scripts::resource_manager::{ResourceManager, ResourceStorage},
-    utils::textures::texture_mapper::TextureMapper,
+    utils::{bridge::ChunkPositionGd, textures::texture_mapper::TextureMapper},
     world::{
         block_storage::BlockStorage,
         physics::PhysicsProxy,
@@ -60,7 +60,7 @@ pub struct ChunkMap {
 #[godot_api]
 impl ChunkMap {
     #[signal]
-    fn chunk_recieved();
+    pub fn chunk_loeded(chunk_position: Gd<ChunkPositionGd>);
 }
 
 impl ChunkMap {
@@ -167,7 +167,7 @@ impl ChunkMap {
             if !near_chunks_data.is_full() {
                 return true;
             }
-            
+
             if self.get_chunk(chunk_position).is_none() {
                 // Remove if chunk is not existing for some reason
                 return false;
@@ -238,6 +238,9 @@ impl ChunkMap {
                 let mut chunk_base = chunk_column.get_base();
                 base.add_child(&chunk_base);
                 chunk_column.set_loaded();
+
+                let chunk_pos_gd = ChunkPositionGd::create(*chunk_column.get_chunk_position());
+                self.signals().chunk_loeded().emit(&chunk_pos_gd);
 
                 let mut c = chunk_base.bind_mut();
 

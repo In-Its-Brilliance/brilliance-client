@@ -1,5 +1,5 @@
 use common::chunks::rotation::Rotation;
-use godot::{prelude::Vector3, register::GodotClass};
+use godot::{obj::Gd, prelude::Vector3, register::GodotClass};
 use network::messages::ClientMessages;
 use std::fmt::{self, Display, Formatter};
 
@@ -24,8 +24,8 @@ impl EntityMovement {
         &self.position
     }
 
-    pub fn create(position: Vector3, rotation: Rotation) -> Self {
-        Self { position, rotation }
+    pub fn create(position: Vector3, rotation: Rotation) -> Gd<Self> {
+        Gd::<Self>::from_init_fn(|_base| Self { position, rotation })
     }
 
     pub fn into_network(&self) -> ClientMessages {

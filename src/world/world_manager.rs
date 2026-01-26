@@ -96,6 +96,10 @@ impl WorldManager {
         self.chunk_map.bind()
     }
 
+    pub fn get_chunk_map_mut(&mut self) -> GdMut<'_, ChunkMap> {
+        self.chunk_map.bind_mut()
+    }
+
     /// Recieve chunk data from network
     pub fn recieve_chunk(&mut self, center: ChunkPosition, chunk_position: ChunkPosition, data: ChunkData) {
         self.chunk_map

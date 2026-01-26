@@ -1,8 +1,10 @@
 use common::{
-    chunks::{block_position::ChunkBlockPosition, chunk_position::ChunkPosition, position::Vector3 as NetworkVector3}, utils::fix_chunk_loc_pos,
+    chunks::{block_position::ChunkBlockPosition, chunk_position::ChunkPosition, position::Vector3 as NetworkVector3},
+    utils::fix_chunk_loc_pos,
     CHUNK_SIZE,
 };
 use godot::prelude::Vector3 as GDVector3;
+use godot::prelude::*;
 
 pub trait IntoGodotVector {
     fn to_godot(&self) -> GDVector3;
@@ -45,5 +47,24 @@ pub struct GodotPositionConverter;
 impl GodotPositionConverter {
     pub fn get_chunk_y_local(y: u8) -> f32 {
         y as f32 * CHUNK_SIZE as f32
+    }
+}
+
+#[derive(GodotClass)]
+#[class(no_init)]
+pub struct ChunkPositionGd {
+    inner: ChunkPosition,
+}
+
+impl ChunkPositionGd {
+    pub fn create(pos: ChunkPosition) -> Gd<Self> {
+        Gd::<Self>::from_init_fn(|_base| {
+            Self {
+                inner: pos,
+            }
+        })
+    }
+    pub fn get_inner(&self) -> &ChunkPosition {
+        &self.inner
     }
 }

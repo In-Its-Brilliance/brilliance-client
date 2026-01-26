@@ -363,9 +363,7 @@ impl PlayerController {
 
     fn update_cache_movement(&mut self) {
         // Handle player movement
-        let new_movement = Gd::<EntityMovement>::from_init_fn(|_base| {
-            EntityMovement::create(self.get_position(), Rotation::new(self.get_yaw(), self.get_pitch()))
-        });
+        let new_movement = EntityMovement::create(self.get_position(), Rotation::new(self.get_yaw(), self.get_pitch()));
 
         if self.cache_movement.is_none() || *new_movement.bind() != *self.cache_movement.as_ref().unwrap().bind() {
             let new_chunk = if let Some(old) = self.cache_movement.as_ref() {
