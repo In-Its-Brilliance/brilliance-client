@@ -1,9 +1,9 @@
 use crate::client_scripts::resource_manager::ResourceManager;
-use crate::scenes::main_menu::VERSION;
 use crate::scenes::main_scene::MainScene;
 use crate::utils::bridge::{IntoChunkPositionVector, IntoGodotVector};
 use crate::world::world_manager::WorldManager;
 use crate::world::worlds_manager::WorldsManager;
+use crate::VERSION;
 use common::chunks::chunk_position::ChunkPosition;
 use godot::classes::{Engine, RenderingServer};
 use godot::obj::{Gd, Singleton};

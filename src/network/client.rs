@@ -13,14 +13,32 @@ pub struct NetworkContainer {
     network_lock: Arc<AtomicBool>,
     timer: Arc<RwLock<Instant>>,
 
-    runtime: Arc<tokio::runtime::Runtime>,
+    runtime: Arc<std::sync::Mutex<Option<tokio::runtime::Runtime>>>,
+}
+
+/// Корректно завершает Tokio runtime при уничтожении контейнера.
+///
+/// Tokio runtime нельзя дропать из асинхронного контекста — это вызывает панику
+/// "Cannot drop a runtime in a context where blocking is not allowed".
+/// Godot может уничтожать объекты в async контексте, поэтому используется
+/// `shutdown_background()` который не блокирует.
+impl Drop for NetworkContainer {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.runtime) == 1 {
+            if let Ok(mut guard) = self.runtime.lock() {
+                if let Some(rt) = guard.take() {
+                    rt.shutdown_background();
+                }
+            }
+        }
+    }
 }
 
 impl NetworkContainer {
     pub fn new(ip_port: String) -> Result<Self, String> {
         log::info!(target: "network", "Connecting to the server at &e{}", ip_port);
 
-        let runtime = Arc::new(tokio::runtime::Runtime::new().unwrap());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
         let result = runtime.block_on(async { NetworkClient::new(ip_port).await });
 
         let network = match result {
@@ -28,15 +46,23 @@ impl NetworkContainer {
             Err(e) => return Err(e),
         };
         Ok(Self {
-            runtime: runtime,
+            runtime: Arc::new(std::sync::Mutex::new(Some(runtime))),
             client_network: Arc::new(RwLock::new(network)),
             timer: Arc::new(RwLock::new(Instant::now())),
             network_lock: Arc::new(AtomicBool::new(false)),
         })
     }
 
+    fn with_runtime<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&tokio::runtime::Runtime) -> R,
+    {
+        let guard = self.runtime.lock().unwrap();
+        f(guard.as_ref().expect("Runtime already shutdown"))
+    }
+
     pub(crate) fn get_client(&self) -> tokio::sync::RwLockReadGuard<'_, NetworkClient> {
-        self.runtime.block_on(async { self.client_network.read().await })
+        self.with_runtime(|rt| rt.block_on(async { self.client_network.read().await }))
     }
 
     pub fn send_message(&self, message_type: NetworkMessageType, message: &ClientMessages) {

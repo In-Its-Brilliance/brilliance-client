@@ -1,7 +1,7 @@
 use super::{
     connect_scene::ConnectScreen, main_menu_button::MainMenuButton, main_scene::MainScene, text_screen::TextScreen,
 };
-use crate::{utils::settings::GameSettings};
+use crate::{utils::settings::GameSettings, VERSION};
 use godot::{
     classes::{BoxContainer, Control, Engine, IControl, RichTextLabel},
     meta::AsArg,
@@ -11,8 +11,6 @@ use std::{cell::RefCell, rc::Rc};
 
 const TEXT_CONNECT: &str = "Connect";
 const TEXT_EXIT: &str = "Exit";
-
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(GodotClass)]
 #[class(init, base=Control)]
@@ -150,8 +148,6 @@ impl MainMenu {
 #[godot_api]
 impl IControl for MainMenu {
     fn ready(&mut self) {
-        log::info!(target: "main", "Loading Brilliance version: {}", VERSION);
-
         Engine::singleton().set_max_fps(60);
 
         let mut text_screen = self.text_screen_scene.as_mut().unwrap().instantiate_as::<TextScreen>();

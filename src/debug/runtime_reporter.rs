@@ -13,7 +13,7 @@ macro_rules! lags_template {
         "&cLags detected! ({fps} fps):&r
 &cGodot:&r
 {godot}
-&cProcess {process:?} (calculated: {duration:?}):&r
+&cProcess {process:.1?} (calculated: {duration:.1?}):&r
 {lines}"
     };
 }

@@ -86,7 +86,7 @@ impl WorldsManager {
         let material_3d = self.terrain_material.as_mut().expect("terrain_material is not set");
         material_3d.set_texture(TextureParam::ALBEDO, &image_texture);
 
-        log::info!(target: "main", "Textures builded successfily; texture blocks:{} textures loaded:{} (executed:{:.2?})", block_storage.textures_blocks_count(), texture_mapper.len(), now.elapsed());
+        log::info!(target: "main", "Textures builded successfily; texture blocks:&7{}&r textures loaded:&7{}&r &8(executed:{:.2?})", block_storage.textures_blocks_count(), texture_mapper.len(), now.elapsed());
         return Ok(());
     }
 
@@ -180,13 +180,16 @@ impl WorldsManager {
         let now = std::time::Instant::now();
 
         let mut world = Gd::<WorldManager>::from_init_fn(|base| {
+            let Some(resource_manager) = self.resource_manager.as_ref() else {
+                panic!("resource_manager is not set");
+            };
             WorldManager::create(
                 base,
                 world_slug.clone(),
                 self.texture_mapper.clone(),
                 self.get_materials(),
                 self.block_storage.clone(),
-                self.resource_manager.as_ref().unwrap().clone(),
+                resource_manager.clone(),
             )
         });
 
@@ -208,7 +211,7 @@ impl WorldsManager {
 
         self.world = Some(world.clone());
 
-        log::info!(target: "world", "World \"{}\" created; (executed:{:.2?})", self.world.as_ref().unwrap().bind().get_slug(), now.elapsed());
+        log::info!(target: "world", "World &a\"{}\"&r created; &8(executed:{:.2?})", self.world.as_ref().unwrap().bind().get_slug(), now.elapsed());
 
         world
     }
