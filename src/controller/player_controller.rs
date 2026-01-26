@@ -29,7 +29,7 @@ const TURN_SPEED: f64 = 6.0;
 const MOVEMENT_SPEED: f32 = 4.0;
 
 const CHARACTER_GRAVITY: f32 = -10.0;
-const JUMP_SPEED: f32 = 8.0;
+const JUMP_SPEED: f32 = 9.0;
 const SNAP_TO_GROUND: f32 = 0.1;
 
 pub(crate) const CAMERA_DISTANCE: f32 = 2.5;
@@ -259,7 +259,16 @@ impl PlayerController {
     }
 
     fn is_grounded(&self) -> bool {
-        self._is_grounded
+        self.grounded_timer > -0.1
+    }
+
+    fn jump(&mut self) {
+        self.grounded_timer = -0.1;
+        self.vertical_movement = JUMP_SPEED;
+        
+        if let Some(entity) = self.entity.as_mut() {
+            entity.bind_mut().trigger_animation(GenericAnimations::Jump);
+        }
     }
 
     /// Вычисляет вектор движения персонажа на основе пользовательского ввода.
@@ -522,14 +531,8 @@ impl INode3D for PlayerController {
             }
 
             // Jump
-            let is_groundeded = self.is_groundeded();
-            if let Some(entity) = self.entity.as_mut() {
-                let controls = self.controls.bind();
-                if controls.is_jumping() && is_groundeded && !Console::is_active() {
-                    entity.bind_mut().trigger_animation(GenericAnimations::Jump);
-                    self.vertical_movement = JUMP_SPEED;
-                    log::info!("self.vertical_movement {}", self.vertical_movement);
-                }
+            if self.controls.bind().is_jumping() && self.is_grounded() && !Console::is_active() {
+                self.jump();
             }
 
             let mut movement = {
