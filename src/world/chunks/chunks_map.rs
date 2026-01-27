@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     client_scripts::resource_manager::{ResourceManager, ResourceStorage},
-    utils::{bridge::ChunkPositionGd, textures::texture_mapper::TextureMapper},
+    utils::textures::texture_mapper::TextureMapper,
     world::{
         block_storage::BlockStorage,
         physics::PhysicsProxy,
@@ -30,7 +30,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-const MAX_CHUNKS_SPAWN_PER_FRAME: i32 = 6;
+const MAX_CHUNKS_SPAWN_PER_FRAME: usize = 6;
 pub const LIMIT_CHUNK_LOADING_AT_A_TIME: usize = 16;
 
 pub type ChunkLock = Arc<RwLock<ChunkColumn>>;
@@ -58,10 +58,7 @@ pub struct ChunkMap {
 }
 
 #[godot_api]
-impl ChunkMap {
-    #[signal]
-    pub fn chunk_loeded(chunk_position: Gd<ChunkPositionGd>);
-}
+impl ChunkMap {}
 
 impl ChunkMap {
     pub fn create(base: Base<Node>) -> Self {
@@ -221,14 +218,14 @@ impl ChunkMap {
     }
 
     /// Retrieving loaded chunks to add them to the root node
-    pub fn spawn_loaded_chunks(&mut self, physics: &PhysicsProxy) {
+    pub fn spawn_loaded_chunks(&mut self, physics: &PhysicsProxy) -> Vec<ChunkPosition> {
         let mut base = self.base_mut().clone();
 
         // for l in self.chunks_to_spawn.1.drain() {
 
-        let mut i = 0;
+        let mut loaded_chunks: Vec<ChunkPosition> = Default::default();
         loop {
-            if i > MAX_CHUNKS_SPAWN_PER_FRAME {
+            if loaded_chunks.len() > MAX_CHUNKS_SPAWN_PER_FRAME {
                 break;
             }
             // Take only one chunk
@@ -239,9 +236,6 @@ impl ChunkMap {
                 base.add_child(&chunk_base);
                 chunk_column.set_loaded();
 
-                let chunk_pos_gd = ChunkPositionGd::create(*chunk_column.get_chunk_position());
-                self.signals().chunk_loeded().emit(&chunk_pos_gd);
-
                 let mut c = chunk_base.bind_mut();
 
                 for section in c.sections.iter_mut() {
@@ -250,11 +244,12 @@ impl ChunkMap {
                     }
                 }
 
-                i += 1;
+                loaded_chunks.push(chunk_column.get_chunk_position().clone());
             } else {
                 break;
             }
         }
+        loaded_chunks
     }
 
     pub fn unload_chunk(&mut self, chunk_position: ChunkPosition) {

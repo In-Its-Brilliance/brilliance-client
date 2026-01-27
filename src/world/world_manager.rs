@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     client_scripts::resource_manager::ResourceStorage, entities::entities_manager::EntitiesManager,
-    scenes::main_scene::ResourceManagerType,
+    scenes::main_scene::ResourceManagerType, utils::bridge::ChunkPositionGd,
 };
 use common::chunks::{
     block_position::BlockPosition,
@@ -126,7 +126,10 @@ impl WorldManager {
 }
 
 #[godot_api]
-impl WorldManager {}
+impl WorldManager {
+    #[signal]
+    pub fn chunk_loeded(chunk_position: Vec<Gd<ChunkPositionGd>>);
+}
 
 #[godot_api]
 impl INode for WorldManager {
@@ -176,12 +179,17 @@ impl INode for WorldManager {
             );
         }
 
-        {
+        let mut loaded_chunks = {
             let _span = crate::span!("world_manager.custom_process::spawn_loaded_chunks");
 
             let mut map = self.chunk_map.bind_mut();
-            map.spawn_loaded_chunks(&self.physics);
-        }
+            map.spawn_loaded_chunks(&self.physics)
+        };
+        let loaded_chunks_gd: Vec<Gd<ChunkPositionGd>> = loaded_chunks
+            .drain(..)
+            .map(|chunk_column| ChunkPositionGd::create(chunk_column))
+            .collect();
+        self.signals().chunk_loeded().emit(loaded_chunks_gd);
 
         {
             let _span = crate::span!("world_manager.custom_process::update_chunks_geometry");

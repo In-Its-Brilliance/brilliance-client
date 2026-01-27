@@ -5,7 +5,6 @@ use crate::controller::enums::controller_actions::ControllerActions;
 use crate::controller::player_action::PlayerAction;
 use crate::controller::selected_item::{SelectedItem, SelectedItemGd};
 use crate::debug::debug_info::DebugInfo;
-use crate::logger::CONSOLE_LOGGER;
 use crate::network::client::NetworkContainer;
 use crate::network::events::handle_network_events;
 use crate::scenes::text_screen::TextScreen;
@@ -63,9 +62,7 @@ pub struct MainScene {
     #[export]
     debug_info_scene: Option<Gd<PackedScene>>,
 
-    #[var(usage_flags = [GROUP, EDITOR, READ_ONLY])]
-    debug_world: u32,
-
+    #[export_group(name = "Debug Settings")]
     #[var(get, set = regenerate_debug_world)]
     #[export]
     regenerate_map_button: bool,
@@ -80,7 +77,7 @@ pub struct MainScene {
     game_settings: Option<Rc<RefCell<GameSettings>>>,
 
     #[export]
-    worlde_environment: Option<Gd<WorldEnvironment>>,
+    world_environment: Option<Gd<WorldEnvironment>>,
 
     #[cfg(debug_assertions)]
     #[init(val = 0)]
@@ -175,7 +172,7 @@ impl MainScene {
 
         let world = if let Some(world) = worlds_manager.get_world() {
             if world.bind().get_slug() != &world_slug {
-                // Player moving to another world; old one must be destroyed
+                log::debug!("Destroying old world... (Player moving to another world; old one must be destroyed)");
                 worlds_manager.destroy_world();
                 worlds_manager.create_world(world_slug)
             } else {
@@ -265,8 +262,8 @@ impl MainScene {
                     };
                     settings.ssao = value;
                     settings.save().unwrap();
-                    let worlde_environment = self.worlde_environment.as_mut().unwrap();
-                    let mut environment = worlde_environment.get_environment().unwrap();
+                    let world_environment = self.world_environment.as_mut().unwrap();
+                    let mut environment = world_environment.get_environment().unwrap();
                     environment.set_ssao_enabled(settings.ssao);
                     log::info!(target: "main", "&aSetting SSAO changed to &2{}", settings.ssao);
                     return;
@@ -323,10 +320,11 @@ impl MainScene {
 
     #[func]
     fn regenerate_debug_world(&mut self, _value: bool) {
-        log::info!(target: "main", "Regenerate debug world");
+        log::info!(target: "main", "&dRegenerate debug world...");
 
         let Some(settings_file) = FileAccess::open(&self.debug_world_settings.to_string(), ModeFlags::READ) else {
             log::error!(
+                target: "main",
                 "World settings file {} not found",
                 self.debug_world_settings.to_string()
             );
@@ -335,29 +333,23 @@ impl MainScene {
         let settings: WorldGeneratorSettings = match serde_yaml::from_str(&settings_file.get_as_text().to_string()) {
             Ok(s) => s,
             Err(e) => {
-                log::error!("World settings yaml error: {}", e);
+                log::error!(target: "main", "World settings yaml error: {}", e);
                 return;
             }
         };
 
-        let wm = self.worlds_manager.as_mut().expect("worlds_manager is not init");
-
-        {
-            let wm = wm.bind_mut();
-            let mut block_storage = wm.get_block_storage_mut();
-            let mut block_id_map: BTreeMap<BlockIndexType, String> = Default::default();
-            let _ = generate_block_id_map(&mut block_id_map, block_storage.iter_values());
-            block_storage.set_block_id_map(block_id_map);
-        }
+        let wm = self.worlds_manager.as_mut().expect("worlds_manager is not set");
 
         let rm = self.resource_manager.borrow();
         let resources_storage = rm.get_resources_storage();
         wm.bind_mut().build_textures(&*resources_storage).unwrap();
 
         if wm.bind().get_world().is_some() {
+            log::info!(target: "main", "&dDestoying old debug world...");
             wm.bind_mut().destroy_world();
         }
 
+        log::info!(target: "main", "&dCreating new debug world...");
         let mut world = wm.bind_mut().create_world(String::from("TestWorld"));
         generate_chunks(&mut world, 0, 0, self.debug_render_distance, settings);
     }
@@ -419,8 +411,16 @@ impl INode for MainScene {
         log::info!(target: "main", "Local resources loaded successfully (count: {})", self.get_resource_manager().get_resources_storage().get_resources_count());
 
         if Engine::singleton().is_editor_hint() {
-            if let Err(e) = log::set_logger(&CONSOLE_LOGGER) {
-                log::error!(target: "main", "log::set_logger error: {}", e)
+            {
+                let wm = self.worlds_manager.as_mut().expect("worlds_manager is not set");
+                let mut wm = wm.bind_mut();
+
+                wm.resource_manager = Some(self.resource_manager.clone());
+                
+                let mut block_storage = wm.get_block_storage_mut();
+                let mut block_id_map: BTreeMap<BlockIndexType, String> = Default::default();
+                let _ = generate_block_id_map(&mut block_id_map, block_storage.iter_values());
+                block_storage.set_block_id_map(block_id_map);
             }
             self.regenerate_debug_world(false);
         } else {
@@ -464,8 +464,8 @@ impl INode for MainScene {
 
         if let Some(game_settings) = self.game_settings.as_ref() {
             let settings = game_settings.borrow();
-            if let Some(worlde_environment) = self.worlde_environment.as_mut() {
-                let mut environment = worlde_environment.get_environment().unwrap();
+            if let Some(world_environment) = self.world_environment.as_mut() {
+                let mut environment = world_environment.get_environment().unwrap();
                 environment.set_ssao_enabled(settings.ssao);
             }
             Engine::singleton().set_max_fps(settings.max_fps as i32);

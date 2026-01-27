@@ -22,27 +22,28 @@ pub struct RuntimeReporter;
 
 static LAST_REPORT: Mutex<Option<Instant>> = Mutex::new(None);
 
+fn fmt_dur(d: Duration) -> String {
+    format!("{:.1?}", d)
+}
+
 fn godot_stats() -> String {
     let p = Performance::singleton();
-
-    let process = p.get_monitor(Monitor::TIME_PROCESS);
-    let physics = p.get_monitor(Monitor::TIME_PHYSICS_PROCESS);
-    let navigation = p.get_monitor(Monitor::TIME_NAVIGATION_PROCESS);
-
+    let process = Duration::from_secs_f64(p.get_monitor(Monitor::TIME_PROCESS));
+    let physics = Duration::from_secs_f64(p.get_monitor(Monitor::TIME_PHYSICS_PROCESS));
+    let navigation = Duration::from_secs_f64(p.get_monitor(Monitor::TIME_NAVIGATION_PROCESS));
     let draw_calls = p.get_monitor(Monitor::RENDER_TOTAL_DRAW_CALLS_IN_FRAME);
     let objects = p.get_monitor(Monitor::RENDER_TOTAL_OBJECTS_IN_FRAME);
     let primitives = p.get_monitor(Monitor::RENDER_TOTAL_PRIMITIVES_IN_FRAME);
-
     let mem_static = p.get_monitor(Monitor::MEMORY_STATIC) / 1024.0 / 1024.0;
     let vram = p.get_monitor(Monitor::RENDER_VIDEO_MEM_USED) / 1024.0 / 1024.0;
 
     format!(
-        "  &acpu process &7{:?} &r| &aphysics &7{:?}
-  &anavigation &7{:?} &r| &arender draws &7{:.0} &r| &aobjects &7{:.0}
-  &aprimitives &7{:.0} &r| &amemory ram &7{:.1}MB &r| &avram &7{:.1}MB",
-        Duration::from_secs_f64(process),
-        Duration::from_secs_f64(physics),
-        Duration::from_secs_f64(navigation),
+        "  &acpu process &7{:<8} &r| &aphysics &7{}
+  &anavigation  &7{:<8} &r| &arender draws &7{:<4.0} &r  | &aobjects &7{:.0}
+  &aprimitives  &7{:<8.0} &r| &amemory ram &7{:<6.1}MB &r| &avram &7{:.1}MB",
+        fmt_dur(process),
+        fmt_dur(physics),
+        fmt_dur(navigation),
         draw_calls,
         objects,
         primitives,

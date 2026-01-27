@@ -202,8 +202,7 @@ impl WorldsManager {
 
         {
             let mut world = world.bind_mut();
-            let mut chunk_map = world.get_chunk_map_mut();
-            chunk_map
+            world
                 .signals()
                 .chunk_loeded()
                 .connect_other(&self.to_gd(), Self::chunk_loeded);
@@ -221,18 +220,16 @@ impl WorldsManager {
 
         let mut base = self.base_mut().clone();
 
-        let world_slug;
-        if let Some(world) = self.world.as_mut().take() {
-            world_slug = world.bind().get_slug().clone();
-            base.remove_child(&world.clone());
-        } else {
+        let Some(world) = self.world.as_mut().take() else {
             panic!("destroy_world: world is not exists");
-        }
+        };
+        let world_slug = world.bind().get_slug().clone();
+        base.remove_child(&world.clone());
 
         if let Some(player_controller) = self.player_controller.as_mut().take() {
             base.remove_child(&player_controller.clone());
         }
-        log::info!(target: "world", "World \"{}\" destroyed; (executed:{:.2?})", world_slug, now.elapsed());
+        log::info!(target: "world", "World &a\"{}\"&r destroyed; &8(executed:{:.2?})", world_slug, now.elapsed());
     }
 }
 
@@ -249,14 +246,14 @@ impl WorldsManager {
 
         let chunk_map = world.get_chunk_map();
 
-        if let Some(player_controller) = self.player_controller.as_mut() {
-            let chunk_pos = player_controller.get_position().to_chunk_position();
+        if let Some(player_controller) = self.player_controller.as_ref() {
+            let player_chunk_position = player_controller.get_position().to_chunk_position();
 
-            let chunk_loaded = match chunk_map.get_chunk(&chunk_pos) {
+            let chunk_loaded = match chunk_map.get_chunk(&player_chunk_position) {
                 Some(c) => c.read().is_loaded(),
                 None => false,
             };
-            player_controller.bind_mut().set_frozen(!chunk_loaded);
+            player_controller.bind().set_frozen(!chunk_loaded);
         }
 
         if new_chunk {
@@ -270,14 +267,21 @@ impl WorldsManager {
         }
     }
 
-    pub fn chunk_loeded(&mut self, chunk_position: Gd<ChunkPositionGd>) {
-        let chunk_position = chunk_position.bind().get_inner().clone();
-
+    #[func]
+    pub fn chunk_loeded(&mut self, chunks: Vec<Gd<ChunkPositionGd>>) {
         if let Some(player_controller) = self.player_controller.as_ref() {
-            let chunk_pos = player_controller.get_position().to_chunk_position();
+            let player_chunk_position = {
+                let pc = player_controller.bind();
+                pc.get_position().to_chunk_position()
+            };
 
-            if chunk_pos == chunk_position {
-                player_controller.bind().set_frozen(false);
+            for chunk_position in chunks.iter() {
+                let chunk_pos = chunk_position.bind().get_inner().clone();
+
+                if player_chunk_position == chunk_pos {
+                    player_controller.bind().set_frozen(false);
+                    break;
+                }
             }
         }
     }
